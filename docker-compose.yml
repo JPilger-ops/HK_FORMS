@@ -1,0 +1,46 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-hkforms}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - hkforms
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/hkforms}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://192.168.60.100:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      ADMIN_NOTIFICATION_EMAILS: ${ADMIN_NOTIFICATION_EMAILS}
+      APP_URL: ${APP_URL:-http://192.168.60.100:3000}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-10}
+      SEND_GUEST_CONFIRMATION: ${SEND_GUEST_CONFIRMATION:-false}
+      INVITE_LINK_HOURS: ${INVITE_LINK_HOURS:-48}
+    ports:
+      - "3000:3000"
+    networks:
+      - hkforms
+
+networks:
+  hkforms:
+    driver: bridge
+
+volumes:
+  pgdata:

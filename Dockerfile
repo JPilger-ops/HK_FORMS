@@ -1,0 +1,15 @@
+FROM mcr.microsoft.com/playwright:v1.43.1-jammy as base
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npm run prisma:generate
+RUN npm run build
+
+FROM mcr.microsoft.com/playwright:v1.43.1-jammy as runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+COPY --from=base /app .
+EXPOSE 3000
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
