@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { ComponentType, useRef } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
 };
 
 export function SignaturePad({ onChange }: Props) {
+  const SignatureCanvasAny = SignatureCanvas as unknown as ComponentType<any>;
   const ref = useRef<SignatureCanvas | null>(null);
 
   const handleEnd = () => {
@@ -19,8 +20,8 @@ export function SignaturePad({ onChange }: Props) {
 
   return (
     <div>
-      <SignatureCanvas
-        ref={ref}
+      <SignatureCanvasAny
+        ref={ref as any}
         penColor="#0f172a"
         backgroundColor="#fff"
         canvasProps={{ className: 'h-48 w-full rounded border border-slate-300 bg-white' }}

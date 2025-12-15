@@ -2,40 +2,51 @@
 
 import { assertPermission } from '@/lib/rbac';
 import { createInviteLink } from '@/lib/tokens';
-import { writeAuditLog } from '@/lib/audit';
-import { sendReservationMail } from '@/lib/email';
+import { sendInviteEmail } from '@/lib/email';
 import { getBaseUrl } from '@/lib/auth';
 
-const defaultHours = Number(process.env.INVITE_LINK_HOURS ?? 48) || 48;
+const defaultDays = Number(process.env.INVITE_DEFAULT_EXPIRY_DAYS ?? 7) || 7;
 
-export async function issueInviteLink(reservationId: string, expiresInHours = defaultHours) {
+export async function issueInviteLink(
+  formKey: string,
+  recipientEmail?: string,
+  expiresInDays = defaultDays
+) {
   const session = await assertPermission('edit:requests');
-  const token = await createInviteLink(reservationId, session?.user?.id, expiresInHours);
-  await writeAuditLog({ reservationId, userId: session.user?.id, action: 'INVITE_LINK' });
+  const { token } = await createInviteLink({
+    formKey,
+    createdByUserId: session?.user?.id,
+    recipientEmail,
+    expiresInDays
+  });
   return token;
 }
 
 export async function sendInviteLinkEmailAction({
-  reservationId,
+  formKey,
   recipient,
-  expiresInHours,
+  expiresInDays,
   appUrl
 }: {
-  reservationId: string;
+  formKey: string;
   recipient: string;
-  expiresInHours?: number;
+  expiresInDays?: number;
   appUrl?: string;
 }) {
   const session = await assertPermission('send:emails');
-  const token = await createInviteLink(reservationId, session.user?.id, expiresInHours ?? defaultHours);
-  const base = (appUrl || getBaseUrl()).replace(/\/$/, '');
-  const link = `${base}/request?token=${token}`;
-  await sendReservationMail({
-    reservationId,
-    to: recipient,
-    subject: 'Reservierungsformular Heidekönig',
-    html: `<p>Bitte füllen Sie Ihr Reservierungsformular aus:</p><p><a href="${link}">${link}</a></p>`
+  const { token, invite } = await createInviteLink({
+    formKey,
+    createdByUserId: session.user?.id,
+    recipientEmail: recipient,
+    expiresInDays: expiresInDays ?? defaultDays
   });
-  await writeAuditLog({ reservationId, userId: session.user?.id, action: 'INVITE_EMAIL' });
-  return { link };
+  const base = (appUrl || getBaseUrl()).replace(/\/$/, '');
+  await sendInviteEmail({
+    inviteId: invite.id,
+    to: recipient,
+    token,
+    formKey,
+    appUrl: base
+  });
+  return { link: `${base}/request?token=${token}` };
 }

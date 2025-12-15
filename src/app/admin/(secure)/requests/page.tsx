@@ -3,15 +3,20 @@ import { AdminShell } from '@/components/admin/shell';
 import { StatusBadge } from '@/components/admin/status-badge';
 import Link from 'next/link';
 import { assertPermission } from '@/lib/rbac';
+import { Prisma } from '@prisma/client';
 
-export default async function RequestsPage({ searchParams }: { searchParams?: Record<string, string> }) {
+export default async function RequestsPage({
+  searchParams
+}: {
+  searchParams?: Record<string, string>;
+}) {
   await assertPermission('view:requests');
   const search = searchParams?.q;
   const where = search
     ? {
         OR: [
-          { guestName: { contains: search, mode: 'insensitive' } },
-          { guestEmail: { contains: search, mode: 'insensitive' } }
+          { guestName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { guestEmail: { contains: search, mode: Prisma.QueryMode.insensitive } }
         ]
       }
     : {};

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ReservationInput, reservationSchema } from '@/lib/validation';
@@ -10,6 +10,7 @@ import { createReservationAction } from '@/server/actions/reservations';
 export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenValid, setTokenValid] = useState(true);
   const [isPending, startTransition] = useTransition();
   const {
     register,
@@ -24,6 +25,10 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
   });
 
   const onSubmit = (values: ReservationInput) => {
+    if (!tokenValid) {
+      setError('Einladungslink ist ungültig.');
+      return;
+    }
     startTransition(async () => {
       const result = await createReservationAction(values, { inviteToken });
       if (result.success) {
@@ -33,12 +38,33 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         const messages: Record<string, string> = {
           RATE_LIMITED: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.',
           TOKEN_INVALID: 'Der Link ist ungültig oder abgelaufen.',
+          TOKEN_REQUIRED: 'Ein gültiger Einladungslink ist erforderlich.',
           VALIDATION_ERROR: 'Bitte überprüfen Sie Ihre Eingaben.'
         };
         setError(messages[result.error ?? ''] ?? 'Fehler beim Senden.');
       }
     });
   };
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    const validate = async () => {
+      try {
+        const res = await fetch(`/api/invites/validate?token=${encodeURIComponent(inviteToken)}`);
+        if (!res.ok) {
+          setTokenValid(false);
+          setError('Einladungslink ist ungültig oder abgelaufen.');
+        } else {
+          setTokenValid(true);
+          setError(null);
+        }
+      } catch {
+        setTokenValid(false);
+        setError('Einladungslink ist ungültig oder abgelaufen.');
+      }
+    };
+    validate();
+  }, [inviteToken]);
 
   if (success) {
     return (
@@ -60,7 +86,11 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">E-Mail*</label>
-          <input type="email" {...register('guestEmail')} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            type="email"
+            {...register('guestEmail')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
           {errors.guestEmail && <p className="text-sm text-red-600">{errors.guestEmail.message}</p>}
         </div>
         <div>
@@ -72,15 +102,27 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
       <section className="grid gap-4 md:grid-cols-3">
         <div>
           <label className="block text-sm font-medium text-slate-600">Datum*</label>
-          <input type="date" {...register('eventDate')} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            type="date"
+            {...register('eventDate')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Start*</label>
-          <input type="time" {...register('eventStartTime')} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            type="time"
+            {...register('eventStartTime')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Ende*</label>
-          <input type="time" {...register('eventEndTime')} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            type="time"
+            {...register('eventEndTime')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
         </div>
       </section>
 
@@ -91,7 +133,12 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Personenzahl*</label>
-          <input type="number" min={1} {...register('numberOfGuests', { valueAsNumber: true })} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            type="number"
+            min={1}
+            {...register('numberOfGuests', { valueAsNumber: true })}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
         </div>
       </section>
 
@@ -110,7 +157,11 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Extras / Wünsche</label>
-          <textarea {...register('extras')} className="mt-1 w-full rounded border px-3 py-2" rows={3} />
+          <textarea
+            {...register('extras')}
+            className="mt-1 w-full rounded border px-3 py-2"
+            rows={3}
+          />
         </div>
       </section>
 
@@ -138,11 +189,18 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
       <section className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-slate-600">Zuständig (Team)</label>
-          <input {...register('internalResponsible')} className="mt-1 w-full rounded border px-3 py-2" />
+          <input
+            {...register('internalResponsible')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Bemerkungen</label>
-          <textarea {...register('internalNotes')} className="mt-1 w-full rounded border px-3 py-2" rows={2} />
+          <textarea
+            {...register('internalNotes')}
+            className="mt-1 w-full rounded border px-3 py-2"
+            rows={2}
+          />
         </div>
       </section>
 

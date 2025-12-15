@@ -16,26 +16,27 @@ const mockReservation = {
 
 vi.mock('@/lib/prisma', () => {
   const reservationStore: any = {};
-  return {
-    prisma: {
-      reservationRequest: {
-        create: vi.fn(async ({ data }: any) => {
-          reservationStore[data.id ?? 'latest'] = { ...mockReservation, ...data };
-          return { ...mockReservation, ...data };
-        }),
-        findUnique: vi.fn(async () => ({ ...mockReservation, signatures: [] }))
-      },
-      signature: {
-        create: vi.fn(async () => ({}))
-      },
-      emailLog: {
-        create: vi.fn(async () => ({}))
-      },
-      auditLog: {
-        create: vi.fn(async () => ({}))
-      }
+  const prisma = {
+    reservationRequest: {
+      create: vi.fn(async ({ data }: any) => {
+        reservationStore[data.id ?? 'latest'] = { ...mockReservation, ...data };
+        return { ...mockReservation, ...data };
+      }),
+      findUnique: vi.fn(async () => ({ ...mockReservation, signatures: [] }))
+    },
+    signature: {
+      create: vi.fn(async () => ({}))
+    },
+    emailLog: {
+      create: vi.fn(async () => ({}))
+    },
+    auditLog: {
+      create: vi.fn(async () => ({}))
     }
   };
+  // @ts-expect-error test mock
+  prisma.$transaction = async (cb: any) => cb(prisma);
+  return { prisma };
 });
 
 vi.mock('@/lib/pdf', () => ({

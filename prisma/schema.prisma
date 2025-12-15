@@ -25,81 +25,91 @@ enum SignatureType {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String               @id @default(uuid())
+  email        String               @unique
   passwordHash String
-  role         Role     @default(STAFF)
-  createdAt    DateTime @default(now())
+  role         Role                 @default(STAFF)
+  createdAt    DateTime             @default(now())
   lastLoginAt  DateTime?
   reservations ReservationRequest[] @relation("ReservationAssigned")
   inviteLinks  InviteLink[]         @relation("InviteCreatedBy")
 }
 
 model ReservationRequest {
-  id                   String        @id @default(uuid())
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  status               ReservationStatus @default(NEW)
-  guestName            String
-  guestEmail           String
-  guestPhone           String?
-  eventDate            DateTime
-  eventType            String
-  eventStartTime       String
-  eventEndTime         String
-  numberOfGuests       Int
-  paymentMethod        String
-  extras               String?
-  priceEstimate        Decimal?      @db.Decimal(10, 2)
-  totalPrice           Decimal?      @db.Decimal(10, 2)
-  internalResponsible  String?
-  internalNotes        String?
-  assignedToId         String? 
-  assignedTo           User?         @relation("ReservationAssigned", fields: [assignedToId], references: [id])
-  signatures           Signature[]
-  emails               EmailLog[]
-  inviteLinks          InviteLink[]
-  auditLogs            AuditLog[]
+  id                  String            @id @default(uuid())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  status              ReservationStatus @default(NEW)
+  guestName           String
+  guestEmail          String
+  guestPhone          String?
+  eventDate           DateTime
+  eventType           String
+  eventStartTime      String
+  eventEndTime        String
+  numberOfGuests      Int
+  paymentMethod       String
+  extras              String?
+  priceEstimate       Decimal?          @db.Decimal(10, 2)
+  totalPrice          Decimal?          @db.Decimal(10, 2)
+  internalResponsible String?
+  internalNotes       String?
+  assignedToId        String?
+  assignedTo          User?             @relation("ReservationAssigned", fields: [assignedToId], references: [id])
+  signatures          Signature[]
+  emails              EmailLog[]
+  auditLogs           AuditLog[]
+  invitesUsed         InviteLink[]      @relation("InviteUsedBy")
 }
 
 model Signature {
-  id             String         @id @default(uuid())
-  reservationId  String
-  reservation    ReservationRequest @relation(fields: [reservationId], references: [id])
-  type           SignatureType
-  imageData      Bytes
-  createdAt      DateTime       @default(now())
+  id            String             @id @default(uuid())
+  reservationId String
+  reservation   ReservationRequest @relation(fields: [reservationId], references: [id])
+  type          SignatureType
+  imageData     Bytes
+  createdAt     DateTime           @default(now())
+
   @@unique([reservationId, type])
 }
 
 model EmailLog {
-  id            String    @id @default(uuid())
-  reservationId String
-  reservation   ReservationRequest @relation(fields: [reservationId], references: [id])
+  id            String              @id @default(uuid())
+  reservationId String?
+  reservation   ReservationRequest? @relation(fields: [reservationId], references: [id])
+  inviteLinkId  String?
+  inviteLink    InviteLink?         @relation("InviteEmails", fields: [inviteLinkId], references: [id])
   to            String
   subject       String
   status        String
   error         String?
-  sentAt        DateTime  @default(now())
+  sentAt        DateTime            @default(now())
 }
 
 model InviteLink {
-  id              String    @id @default(uuid())
-  reservationId   String
-  reservation     ReservationRequest @relation(fields: [reservationId], references: [id])
-  tokenHash       String   @unique
-  createdAt       DateTime @default(now())
-  expiresAt       DateTime?
-  usedAt          DateTime?
-  createdByUserId String?
-  createdBy       User?     @relation("InviteCreatedBy", fields: [createdByUserId], references: [id])
+  id                  String              @id @default(uuid())
+  tokenHash           String              @unique
+  formKey             String
+  createdAt           DateTime            @default(now())
+  expiresAt           DateTime?
+  usedAt              DateTime?
+  usedByReservationId String?
+  usedByReservation   ReservationRequest? @relation("InviteUsedBy", fields: [usedByReservationId], references: [id])
+  createdByUserId     String?
+  createdBy           User?               @relation("InviteCreatedBy", fields: [createdByUserId], references: [id])
+  recipientEmail      String?
+  maxUses             Int                 @default(1)
+  useCount            Int                 @default(0)
+  note                String?
+  isRevoked           Boolean             @default(false)
+  emailLogs           EmailLog[]          @relation("InviteEmails")
 }
 
 model AuditLog {
-  id            String    @id @default(uuid())
+  id            String             @id @default(uuid())
   reservationId String
   reservation   ReservationRequest @relation(fields: [reservationId], references: [id])
   userId        String?
   action        String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime           @default(now())
 }

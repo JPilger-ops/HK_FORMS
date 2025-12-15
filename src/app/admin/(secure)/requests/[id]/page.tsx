@@ -18,7 +18,6 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
   const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const base = getBaseUrl();
-  const defaultInviteHours = Number(process.env.INVITE_LINK_HOURS ?? 48) || 48;
 
   const formatMoney = (value?: any) => (value ? `${value.toString()} €` : '-');
 
@@ -132,7 +131,6 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             reservationId={reservation.id}
             currentStatus={reservation.status}
             appUrl={base}
-            defaultInviteHours={defaultInviteHours}
           />
 
           <div className="mt-6">
@@ -144,7 +142,9 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
                   <p className="text-xs text-slate-500">{log.createdAt.toLocaleString()}</p>
                 </li>
               ))}
-              {reservation.auditLogs.length === 0 && <p className="text-slate-500">Keine Einträge</p>}
+              {reservation.auditLogs.length === 0 && (
+                <p className="text-slate-500">Keine Einträge</p>
+              )}
             </ul>
           </div>
         </div>

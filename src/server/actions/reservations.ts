@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { reservationToPdf } from '@/lib/pdf';
 import { sendReservationMail } from '@/lib/email';
-import { consumeInviteToken } from '@/lib/tokens';
+import { consumeInviteTokenForReservation } from '@/lib/tokens';
 import { ReservationStatus, SignatureType } from '@prisma/client';
 import { assertPermission } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/audit';
@@ -33,62 +33,80 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     return { success: false, error: 'RATE_LIMITED' };
   }
 
-  if (opts?.inviteToken) {
-    const token = await consumeInviteToken(opts.inviteToken);
-    if (!token) {
-      return { success: false, error: 'TOKEN_INVALID' };
-    }
+  const inviteRequired = process.env.INVITE_REQUIRE_TOKEN === 'true';
+  const inviteToken = opts?.inviteToken;
+  if (inviteRequired && !inviteToken) {
+    return { success: false, error: 'TOKEN_REQUIRED' };
   }
 
-  const reservation = await prisma.reservationRequest.create({
-    data: {
-      guestName: data.guestName,
-      guestEmail: data.guestEmail,
-      guestPhone: data.guestPhone,
-      eventDate: new Date(data.eventDate),
-      eventType: data.eventType,
-      eventStartTime: data.eventStartTime,
-      eventEndTime: data.eventEndTime,
-      numberOfGuests: data.numberOfGuests,
-      paymentMethod: data.paymentMethod,
-      extras: data.extras,
-      priceEstimate: normalizeNumber(data.priceEstimate),
-      totalPrice: normalizeNumber(data.totalPrice),
-      internalResponsible: data.internalResponsible,
-      internalNotes: data.internalNotes
+  let reservationWithSignatures;
+  try {
+    reservationWithSignatures = await prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservationRequest.create({
+        data: {
+          guestName: data.guestName,
+          guestEmail: data.guestEmail,
+          guestPhone: data.guestPhone,
+          eventDate: new Date(data.eventDate),
+          eventType: data.eventType,
+          eventStartTime: data.eventStartTime,
+          eventEndTime: data.eventEndTime,
+          numberOfGuests: data.numberOfGuests,
+          paymentMethod: data.paymentMethod,
+          extras: data.extras,
+          priceEstimate: normalizeNumber(data.priceEstimate),
+          totalPrice: normalizeNumber(data.totalPrice),
+          internalResponsible: data.internalResponsible,
+          internalNotes: data.internalNotes
+        }
+      });
+
+      if (inviteToken) {
+        await consumeInviteTokenForReservation(inviteToken, reservation.id);
+      }
+
+      await tx.signature.create({
+        data: {
+          reservationId: reservation.id,
+          type: SignatureType.HOST,
+          imageData: parseSignature(data.signature)
+        }
+      });
+
+      return tx.reservationRequest.findUnique({
+        where: { id: reservation.id },
+        include: { signatures: true }
+      });
+    });
+  } catch (error: any) {
+    const map: Record<string, string> = {
+      TOKEN_INVALID: 'TOKEN_INVALID',
+      TOKEN_REVOKED: 'TOKEN_INVALID',
+      TOKEN_EXPIRED: 'TOKEN_INVALID',
+      TOKEN_USED: 'TOKEN_INVALID'
+    };
+    const code = map[error?.message];
+    if (code) {
+      return { success: false, error: code };
     }
-  });
-
-  await prisma.signature.create({
-    data: {
-      reservationId: reservation.id,
-      type: SignatureType.HOST,
-      imageData: parseSignature(data.signature)
-    }
-  });
-
-  const reservationWithSignatures = await prisma.reservationRequest.findUnique({
-    where: { id: reservation.id },
-    include: { signatures: true }
-  });
-
-  if (!reservationWithSignatures) {
-    return { success: false, error: 'NOT_FOUND' };
+    throw error;
   }
 
   const pdf = await reservationToPdf(reservationWithSignatures);
 
-  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map((x) => x.trim()).filter(Boolean);
+  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
 
   if (adminEmails?.length) {
     await sendReservationMail({
-      reservationId: reservation.id,
+      reservationId: reservationWithSignatures.id,
       to: adminEmails,
-      subject: `Neue Reservierungsanfrage ${reservation.guestName}`,
-      html: `<p>Neue Anfrage von ${reservation.guestName} (${reservation.guestEmail}).</p>`,
+      subject: `Neue Reservierungsanfrage ${reservationWithSignatures.guestName}`,
+      html: `<p>Neue Anfrage von ${reservationWithSignatures.guestName} (${reservationWithSignatures.guestEmail}).</p>`,
       attachments: [
         {
-          filename: `heidekoenig_reservierung_${reservation.id}.pdf`,
+          filename: `heidekoenig_reservierung_${reservationWithSignatures.id}.pdf`,
           content: pdf
         }
       ]
@@ -97,14 +115,14 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
 
   if (process.env.SEND_GUEST_CONFIRMATION === 'true') {
     await sendReservationMail({
-      reservationId: reservation.id,
-      to: reservation.guestEmail,
+      reservationId: reservationWithSignatures.id,
+      to: reservationWithSignatures.guestEmail,
       subject: 'Ihre Anfrage wurde übermittelt',
       html: '<p>Vielen Dank für Ihre Anfrage. Wir melden uns zeitnah.</p>'
     });
   }
 
-  return { success: true, reservationId: reservation.id };
+  return { success: true, reservationId: reservationWithSignatures.id };
 }
 
 export async function updateReservationStatusAction(

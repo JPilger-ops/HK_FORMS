@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth';
 import { cookies, headers } from 'next/headers';
 import { checkRateLimit } from './rate-limit';
 
-export const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -57,6 +57,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/admin/login'
   },
+  // trust proxy headers (required behind Nginx/Proxy Manager)
   trustHost: true,
   callbacks: {
     async jwt({ token, user }) {
@@ -74,7 +75,10 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-next-auth.session-token'
+          : 'next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
