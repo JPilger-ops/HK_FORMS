@@ -6,9 +6,11 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { reservationToPdf } from '@/lib/pdf';
 import { sendReservationMail } from '@/lib/email';
 import { consumeInviteTokenForReservation } from '@/lib/tokens';
-import { ReservationStatus, SignatureType } from '@prisma/client';
+import { Prisma, ReservationStatus, SignatureType } from '@prisma/client';
 import { assertPermission } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/audit';
+import { calculatePricing, getExtraOptions } from '@/lib/pricing';
+import { inviteTokenRequired } from '@/lib/config';
 
 function parseSignature(dataUrl: string) {
   const base64 = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
@@ -33,13 +35,23 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     return { success: false, error: 'RATE_LIMITED' };
   }
 
-  const inviteRequired = process.env.INVITE_REQUIRE_TOKEN === 'true';
+  const inviteRequired = inviteTokenRequired();
   const inviteToken = opts?.inviteToken;
   if (inviteRequired && !inviteToken) {
     return { success: false, error: 'TOKEN_REQUIRED' };
   }
 
-  let reservationWithSignatures;
+  const allowedExtras = new Set(getExtraOptions().map((extra) => extra.id));
+  const selectedExtras = Array.from(
+    new Set((data.selectedExtras ?? []).filter((item) => allowedExtras.has(item)))
+  );
+  const pricing = calculatePricing(data.numberOfGuests, selectedExtras);
+
+  type ReservationWithSignatures = Prisma.ReservationRequestGetPayload<{
+    include: { signatures: true };
+  }>;
+
+  let reservationWithSignatures: ReservationWithSignatures | null;
   try {
     reservationWithSignatures = await prisma.$transaction(async (tx) => {
       const reservation = await tx.reservationRequest.create({
@@ -47,17 +59,20 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
           guestName: data.guestName,
           guestEmail: data.guestEmail,
           guestPhone: data.guestPhone,
+          guestAddress: data.guestAddress,
           eventDate: new Date(data.eventDate),
           eventType: data.eventType,
           eventStartTime: data.eventStartTime,
           eventEndTime: data.eventEndTime,
           numberOfGuests: data.numberOfGuests,
           paymentMethod: data.paymentMethod,
+          extrasSelection: selectedExtras.length ? JSON.stringify(selectedExtras) : null,
           extras: data.extras,
-          priceEstimate: normalizeNumber(data.priceEstimate),
-          totalPrice: normalizeNumber(data.totalPrice),
+          priceEstimate: normalizeNumber(pricing.base),
+          totalPrice: normalizeNumber(pricing.total),
           internalResponsible: data.internalResponsible,
-          internalNotes: data.internalNotes
+          internalNotes: data.internalNotes,
+          privacyAcceptedAt: data.privacyAccepted ? new Date() : null
         }
       });
 
@@ -92,9 +107,15 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     throw error;
   }
 
+  if (!reservationWithSignatures) {
+    throw new Error('RESERVATION_CREATION_FAILED');
+  }
+
   const pdf = await reservationToPdf(reservationWithSignatures);
 
-  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',')
+  const adminEmailTargets = process.env.ADMIN_NOTIFICATION_EMAILS || process.env.SMTP_FROM || '';
+  const adminEmails = adminEmailTargets
+    .split(',')
     .map((x) => x.trim())
     .filter(Boolean);
 

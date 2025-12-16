@@ -5,8 +5,10 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
 ## Features
 
 - Öffentliches Formular `/request` inkl. Validierungen, Canvas-Signatur & optionaler Invite-Token.
+- Automatische Preisberechnung (Grundpreis pro Person + Extras), Gastgeber-Adresse & DSGVO-Einwilligung im Formular.
 - Automatischer PDF-Export (Playwright) & Versand per E-Mail (Nodemailer, SMTP via ENV) + Audit/Email-Logs; Admin-Download via `/api/reservations/[id]/pdf`.
 - Adminpanel `/admin/*` mit NextAuth (Credentials + RBAC Admin/Mitarbeiter), Tabelle, Detailansicht, Statusworkflow, erneuter Mailversand, Mitarbeiter-Unterschrift, Einladungs-Management `/admin/invites` (Token-Links per Mail, Ablauf, Mehrfachnutzung, Revoke), Benutzerverwaltung (nur Admins).
+- Logout-Button + Auto-Logout (konfigurierbare Sitzungsdauer) im Adminbereich.
 - Server Actions + Next.js Route-Handler, Prisma Schema inkl. User, ReservationRequest, Signature, EmailLog, InviteLink, AuditLog.
 - Sicherheitsmaßnahmen: Argon2 Hashing, NextAuth CSRF, sichere Cookies (trusted proxy ready), Rate Limiting für Login & Formular, Audit Logging.
 - Deployment via Docker Compose (Next.js + PostgreSQL) hinter vorhandenem Reverse Proxy.
@@ -15,7 +17,8 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
 
 1. **Voraussetzungen:** Node.js 20+, npm, Docker (für lokale DB) & Playwright-Dependencies (durch Dockerfile oder `npx playwright install --with-deps`).
 2. **ENV anlegen:** `cp .env.example .env` und Werte setzen (DATABASE_URL, NEXTAUTH_URL, SMTP usw.). Für lokale DB: `postgresql://postgres:postgres@localhost:5432/hkforms`. `INVITE_LINK_HOURS` steuert die Gültigkeit der Token-Links.
-   - Neue Invite-Variablen: `INVITE_TOKEN_SECRET`, `INVITE_DEFAULT_EXPIRY_DAYS`, `INVITE_REQUIRE_TOKEN` (true = Formular nur mit gültigem Invite).
+   - Neue Invite-Variablen: `INVITE_TOKEN_SECRET`, `INVITE_DEFAULT_EXPIRY_DAYS`, `INVITE_REQUIRE_TOKEN` (Standard=true, Formular nur mit gültigem Invite).
+   - Preis/Session: `NEXT_PUBLIC_PRICE_PER_GUEST` (Grundpreis pro Person, wird auf Client & Server genutzt) und `AUTO_LOGOUT_MINUTES` (Auto-Logout im Adminbereich).
 3. **Dependencies installieren:** `npm install`.
 4. **Prisma vorbereiten:**
    ```bash
@@ -41,6 +44,7 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
 
 1. **ENV für Produktion:** Mindestens `APP_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DATABASE_URL` (z. B. `postgresql://postgres:postgres@db:5432/hkforms`), SMTP-Settings, Admin-E-Mail-Liste.
 2. **Build & Start:**
+
    ```bash
    docker compose up -d --build
    ```
@@ -48,6 +52,7 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
    - Service `app` führt `prisma migrate deploy` aus und startet `next start`.
    - `db` ist ein PostgreSQL 15-Container mit Volume `pgdata`.
    - Standard-Host laut Vorgabe: App auf `192.168.60.100:3000`, Proxy auf `192.168.50.100`.
+
 3. **Reverse Proxy Manager (bestehender NGINX bei 192.168.50.100):**
    - Forward Host/IP: `192.168.60.100` (App-Server), Port `3000` (oder freigegebenen Compose-Port).
    - SSL/TLS-Termination im Proxy aktivieren (LetsEncrypt), HTTP→HTTPS redirect erzwingen.

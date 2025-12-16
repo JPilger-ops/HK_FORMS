@@ -7,6 +7,9 @@ import { Role } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { cookies, headers } from 'next/headers';
 import { checkRateLimit } from './rate-limit';
+import { getAutoLogoutMinutes } from './config';
+
+const SESSION_MAX_AGE_SECONDS = Math.max(5, getAutoLogoutMinutes()) * 60;
 
 export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
   adapter: PrismaAdapter(prisma),
@@ -51,7 +54,11 @@ export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
     })
   ],
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: SESSION_MAX_AGE_SECONDS
+  },
+  jwt: {
+    maxAge: SESSION_MAX_AGE_SECONDS
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {

@@ -43,17 +43,20 @@ model ReservationRequest {
   guestName           String
   guestEmail          String
   guestPhone          String?
+  guestAddress        String?           @db.Text
   eventDate           DateTime
   eventType           String
   eventStartTime      String
   eventEndTime        String
   numberOfGuests      Int
   paymentMethod       String
+  extrasSelection     String?           @db.Text
   extras              String?
   priceEstimate       Decimal?          @db.Decimal(10, 2)
   totalPrice          Decimal?          @db.Decimal(10, 2)
   internalResponsible String?
   internalNotes       String?
+  privacyAcceptedAt   DateTime?
   assignedToId        String?
   assignedTo          User?             @relation("ReservationAssigned", fields: [assignedToId], references: [id])
   signatures          Signature[]

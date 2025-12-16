@@ -1,4 +1,5 @@
 import { ReservationForm } from '@/components/forms/reservation-form';
+import { inviteTokenRequired } from '@/lib/config';
 
 export default function RequestPage({
   searchParams
@@ -6,7 +7,7 @@ export default function RequestPage({
   searchParams?: Record<string, string | string[]>;
 }) {
   const token = typeof searchParams?.token === 'string' ? searchParams.token : undefined;
-  const requireToken = process.env.INVITE_REQUIRE_TOKEN === 'true';
+  const requireToken = inviteTokenRequired();
   if (requireToken && !token) {
     return (
       <main className="mx-auto max-w-2xl p-6">
