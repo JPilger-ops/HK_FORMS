@@ -1,22 +1,30 @@
 import { z } from 'zod';
 
+const phoneRegex = /^[0-9+()\/\s-]{5,}$/;
+
 export const reservationSchema = z.object({
-  guestName: z.string().min(2),
-  guestEmail: z.string().email(),
-  guestPhone: z.string().optional(),
-  guestAddress: z.string().min(5, 'Adresse erforderlich'),
+  hostFirstName: z.string().min(2, 'Vorname erforderlich'),
+  hostLastName: z.string().min(2, 'Nachname erforderlich'),
+  hostStreet: z.string().min(3, 'Straße und Hausnummer erforderlich'),
+  hostPostalCode: z.string().min(4, 'PLZ erforderlich'),
+  hostCity: z.string().min(2, 'Ort erforderlich'),
+  hostPhone: z
+    .string()
+    .min(5, 'Telefonnummer erforderlich')
+    .regex(phoneRegex, 'Bitte eine gültige Telefonnummer angeben'),
+  hostEmail: z.string().email('E-Mail erforderlich'),
   eventDate: z.string(),
-  eventType: z.string().min(2),
+  eventType: z.string().min(2, 'Bitte Anlass angeben'),
   eventStartTime: z.string(),
-  eventEndTime: z.string(),
-  numberOfGuests: z.coerce.number().min(1),
-  paymentMethod: z.string().min(2),
+  eventEndTime: z.string().default('22:30'),
+  numberOfGuests: z.coerce.number().min(1, 'Personenzahl erforderlich'),
+  paymentMethod: z.enum(['Rechnung', 'Barzahlung'], {
+    required_error: 'Zahlungsart erforderlich'
+  }),
   selectedExtras: z.array(z.string()).default([]),
-  extras: z.string().optional(),
+  notes: z.string().optional(),
   priceEstimate: z.coerce.number().min(0).optional(),
   totalPrice: z.coerce.number().min(0).optional(),
-  internalResponsible: z.string().optional(),
-  internalNotes: z.string().optional(),
   privacyAccepted: z
     .boolean()
     .refine((value) => value === true, 'Bitte bestätigen Sie die Datenschutzhinweise.'),

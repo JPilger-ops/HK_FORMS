@@ -1,8 +1,12 @@
 FROM mcr.microsoft.com/playwright:v1.57.0-jammy as base
 WORKDIR /app
 ENV HUSKY=0
-COPY package.json ./
-RUN npm install
+# Prisma 7 requires DATABASE_URL at build time for `prisma generate`
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hkforms
+ENV DATABASE_URL=${DATABASE_URL}
+
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npm run prisma:generate
 RUN npm run build

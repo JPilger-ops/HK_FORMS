@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -24,6 +23,11 @@ enum SignatureType {
   STAFF
 }
 
+enum ExtraPricingType {
+  PER_PERSON
+  FLAT
+}
+
 model User {
   id           String               @id @default(uuid())
   email        String               @unique
@@ -40,6 +44,13 @@ model ReservationRequest {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   status              ReservationStatus @default(NEW)
+  hostFirstName       String?
+  hostLastName        String?
+  hostStreet          String?
+  hostPostalCode      String?
+  hostCity            String?
+  hostPhone           String?
+  hostEmail           String?
   guestName           String
   guestEmail          String
   guestPhone          String?
@@ -51,18 +62,32 @@ model ReservationRequest {
   numberOfGuests      Int
   paymentMethod       String
   extrasSelection     String?           @db.Text
+  extrasSnapshot      Json?
   extras              String?
   priceEstimate       Decimal?          @db.Decimal(10, 2)
   totalPrice          Decimal?          @db.Decimal(10, 2)
   internalResponsible String?
   internalNotes       String?
   privacyAcceptedAt   DateTime?
+  legacyData          Json?
   assignedToId        String?
   assignedTo          User?             @relation("ReservationAssigned", fields: [assignedToId], references: [id])
   signatures          Signature[]
   emails              EmailLog[]
   auditLogs           AuditLog[]
   invitesUsed         InviteLink[]      @relation("InviteUsedBy")
+}
+
+model ExtraOption {
+  id          String           @id @default(uuid())
+  label       String
+  description String?
+  pricingType ExtraPricingType
+  priceCents  Int
+  isActive    Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }
 
 model Signature {

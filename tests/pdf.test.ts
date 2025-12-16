@@ -21,9 +21,16 @@ describe('reservationToPdf', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       status: ReservationStatus.NEW,
+      hostFirstName: 'Tester',
+      hostLastName: 'Mustermann',
+      hostStreet: 'Straße 1',
+      hostPostalCode: '12345',
+      hostCity: 'Stadt',
+      hostPhone: '01234',
+      hostEmail: 'test@example.com',
       guestName: 'Tester',
       guestEmail: 'test@example.com',
-      guestPhone: '0123',
+      guestPhone: '01234',
       guestAddress: 'Straße 1, 12345 Stadt',
       eventDate: new Date(),
       eventType: 'Feier',
@@ -32,6 +39,15 @@ describe('reservationToPdf', () => {
       numberOfGuests: 10,
       paymentMethod: 'Rechnung',
       extrasSelection: '["drinks"]',
+      extrasSnapshot: [
+        {
+          id: 'drinks',
+          label: 'Getränke',
+          description: null,
+          pricingType: 'PER_PERSON',
+          priceCents: 600
+        }
+      ],
       extras: '',
       priceEstimate: null,
       totalPrice: null,

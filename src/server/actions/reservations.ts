@@ -9,8 +9,14 @@ import { consumeInviteTokenForReservation } from '@/lib/tokens';
 import { Prisma, ReservationStatus, SignatureType } from '@prisma/client';
 import { assertPermission } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/audit';
-import { calculatePricing, getExtraOptions } from '@/lib/pricing';
-import { inviteTokenRequired } from '@/lib/config';
+import {
+  calculatePricing,
+  buildExtrasSnapshot,
+  ExtraOptionInput,
+  parseExtrasSnapshot
+} from '@/lib/pricing';
+
+const ENFORCED_END_TIME = '22:30';
 
 function parseSignature(dataUrl: string) {
   const base64 = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
@@ -24,28 +30,58 @@ function normalizeNumber(value: number | undefined | null) {
   return null;
 }
 
+function formatHostAddress(data: {
+  hostStreet?: string;
+  hostPostalCode?: string;
+  hostCity?: string;
+}) {
+  const parts = [
+    (data.hostStreet ?? '').trim(),
+    [data.hostPostalCode ?? '', data.hostCity ?? ''].filter(Boolean).join(' ').trim()
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
+async function getExtrasForSelection(ids: string[]): Promise<ExtraOptionInput[]> {
+  if (!ids.length) return [];
+  const extras = await prisma.extraOption.findMany({
+    where: { id: { in: ids }, isActive: true },
+    orderBy: { sortOrder: 'asc' }
+  });
+  return extras.map((extra) => ({
+    id: extra.id,
+    label: extra.label,
+    description: extra.description,
+    pricingType: extra.pricingType === 'PER_PERSON' ? 'PER_PERSON' : 'FLAT',
+    priceCents: extra.priceCents
+  }));
+}
+
 export async function createReservationAction(input: unknown, opts?: { inviteToken?: string }) {
   const safeParse = reservationSchema.safeParse(input);
   if (!safeParse.success) {
     return { success: false, error: 'VALIDATION_ERROR', details: safeParse.error.flatten() };
   }
   const data = safeParse.data;
-  const rateKey = `request:${data.guestEmail}`;
+  const rateKey = `request:${data.hostEmail}`;
   if (!checkRateLimit(rateKey)) {
     return { success: false, error: 'RATE_LIMITED' };
   }
 
-  const inviteRequired = inviteTokenRequired();
   const inviteToken = opts?.inviteToken;
-  if (inviteRequired && !inviteToken) {
+  if (!inviteToken) {
     return { success: false, error: 'TOKEN_REQUIRED' };
   }
 
-  const allowedExtras = new Set(getExtraOptions().map((extra) => extra.id));
   const selectedExtras = Array.from(
-    new Set((data.selectedExtras ?? []).filter((item) => allowedExtras.has(item)))
+    new Set((data.selectedExtras ?? []).filter((item) => typeof item === 'string'))
   );
-  const pricing = calculatePricing(data.numberOfGuests, selectedExtras);
+  const extrasOptions = await getExtrasForSelection(selectedExtras);
+  const validExtras = selectedExtras.filter((id) => extrasOptions.some((extra) => extra.id === id));
+  const extrasSnapshot = buildExtrasSnapshot(validExtras, extrasOptions);
+  const pricing = calculatePricing(data.numberOfGuests, validExtras, extrasOptions);
+  const hostFullName = `${data.hostFirstName} ${data.hostLastName}`.trim();
+  const hostAddress = formatHostAddress(data);
 
   type ReservationWithSignatures = Prisma.ReservationRequestGetPayload<{
     include: { signatures: true };
@@ -56,22 +92,30 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     reservationWithSignatures = await prisma.$transaction(async (tx) => {
       const reservation = await tx.reservationRequest.create({
         data: {
-          guestName: data.guestName,
-          guestEmail: data.guestEmail,
-          guestPhone: data.guestPhone,
-          guestAddress: data.guestAddress,
+          hostFirstName: data.hostFirstName,
+          hostLastName: data.hostLastName,
+          hostStreet: data.hostStreet,
+          hostPostalCode: data.hostPostalCode,
+          hostCity: data.hostCity,
+          hostPhone: data.hostPhone,
+          hostEmail: data.hostEmail,
+          guestName: hostFullName,
+          guestEmail: data.hostEmail,
+          guestPhone: data.hostPhone,
+          guestAddress: hostAddress,
           eventDate: new Date(data.eventDate),
           eventType: data.eventType,
           eventStartTime: data.eventStartTime,
-          eventEndTime: data.eventEndTime,
+          eventEndTime: ENFORCED_END_TIME,
           numberOfGuests: data.numberOfGuests,
           paymentMethod: data.paymentMethod,
-          extrasSelection: selectedExtras.length ? JSON.stringify(selectedExtras) : null,
-          extras: data.extras,
+          extrasSelection: validExtras.length ? JSON.stringify(validExtras) : null,
+          extrasSnapshot: extrasSnapshot.length
+            ? (extrasSnapshot as Prisma.InputJsonValue)
+            : undefined,
+          extras: data.notes,
           priceEstimate: normalizeNumber(pricing.base),
           totalPrice: normalizeNumber(pricing.total),
-          internalResponsible: data.internalResponsible,
-          internalNotes: data.internalNotes,
           privacyAcceptedAt: data.privacyAccepted ? new Date() : null
         }
       });
@@ -112,6 +156,21 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   }
 
   const pdf = await reservationToPdf(reservationWithSignatures);
+  const eventDateLabel = new Intl.DateTimeFormat('de-DE').format(
+    reservationWithSignatures.eventDate
+  );
+  const extrasForEmail = parseExtrasSnapshot(reservationWithSignatures.extrasSnapshot);
+  const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const extrasListEmail =
+    extrasForEmail.length > 0
+      ? `<ul>${extrasForEmail
+          .map((extra) => {
+            const price = euro.format(extra.priceCents / 100);
+            const typeLabel = extra.pricingType === 'PER_PERSON' ? 'pro Person' : 'pauschal';
+            return `<li>${extra.label} (${typeLabel}) – ${price}</li>`;
+          })
+          .join('')}</ul>`
+      : '<em>Keine</em>';
 
   const adminEmailTargets = process.env.ADMIN_NOTIFICATION_EMAILS || process.env.SMTP_FROM || '';
   const adminEmails = adminEmailTargets
@@ -124,7 +183,19 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
       reservationId: reservationWithSignatures.id,
       to: adminEmails,
       subject: `Neue Reservierungsanfrage ${reservationWithSignatures.guestName}`,
-      html: `<p>Neue Anfrage von ${reservationWithSignatures.guestName} (${reservationWithSignatures.guestEmail}).</p>`,
+      html: `<p><strong>Neue Anfrage</strong> von ${reservationWithSignatures.guestName} (${reservationWithSignatures.guestEmail})</p>
+        <p>Kontakt: ${reservationWithSignatures.guestPhone ?? '-'} · ${
+          reservationWithSignatures.guestAddress ?? '-'
+        }</p>
+        <p>Veranstaltung: ${eventDateLabel}, ${reservationWithSignatures.eventStartTime} - ${
+          reservationWithSignatures.eventEndTime
+        } · ${reservationWithSignatures.numberOfGuests} Personen · ${
+          reservationWithSignatures.paymentMethod
+        }</p>
+        <p>Extras: ${extrasListEmail}</p>
+        <p>Bemerkungen / Unverträglichkeiten: ${
+          reservationWithSignatures.extras ?? 'Keine Angaben'
+        }</p>`,
       attachments: [
         {
           filename: `heidekoenig_reservierung_${reservationWithSignatures.id}.pdf`,
@@ -139,7 +210,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
       reservationId: reservationWithSignatures.id,
       to: reservationWithSignatures.guestEmail,
       subject: 'Ihre Anfrage wurde übermittelt',
-      html: '<p>Vielen Dank für Ihre Anfrage. Wir melden uns zeitnah.</p>'
+      html: `<p>Vielen Dank für Ihre Anfrage vom ${eventDateLabel}.</p><p>Wir melden uns zeitnah mit einem Angebot. Geplante Zeit: ${reservationWithSignatures.eventStartTime} - ${reservationWithSignatures.eventEndTime}.</p>`
     });
   }
 

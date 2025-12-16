@@ -4,20 +4,19 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
 
 ## Features
 
-- Öffentliches Formular `/request` inkl. Validierungen, Canvas-Signatur & optionaler Invite-Token.
-- Automatische Preisberechnung (Grundpreis pro Person + Extras), Gastgeber-Adresse & DSGVO-Einwilligung im Formular.
-- Automatischer PDF-Export (Playwright) & Versand per E-Mail (Nodemailer, SMTP via ENV) + Audit/Email-Logs; Admin-Download via `/api/reservations/[id]/pdf`.
-- Adminpanel `/admin/*` mit NextAuth (Credentials + RBAC Admin/Mitarbeiter), Tabelle, Detailansicht, Statusworkflow, erneuter Mailversand, Mitarbeiter-Unterschrift, Einladungs-Management `/admin/invites` (Token-Links per Mail, Ablauf, Mehrfachnutzung, Revoke), Benutzerverwaltung (nur Admins).
-- Logout-Button + Auto-Logout (konfigurierbare Sitzungsdauer) im Adminbereich.
-- Server Actions + Next.js Route-Handler, Prisma Schema inkl. User, ReservationRequest, Signature, EmailLog, InviteLink, AuditLog.
-- Sicherheitsmaßnahmen: Argon2 Hashing, NextAuth CSRF, sichere Cookies (trusted proxy ready), Rate Limiting für Login & Formular, Audit Logging.
-- Deployment via Docker Compose (Next.js + PostgreSQL) hinter vorhandenem Reverse Proxy.
+- Public Request-Formular nur per gültigem Invite-Link (`/request?token=...`), serverseitige Validierung + Fehlerseite `/request/invalid`; Fixes: End-Uhrzeit 22:30 wird serverseitig erzwungen.
+- Gastgeberdaten strukturiert (Vor-/Nachname, Adresse, Telefon, E-Mail), Pflichtfeld-Validierung inkl. Basis-Telefoncheck; Zahlungsarten auf Barzahlung/Rechnung beschränkt.
+- Extras kommen aus der Datenbank (`ExtraOption`), Auswahl speichert Snapshot (Label/Preis/Typ) pro Anfrage; Verwaltung im Admin unter `/admin/settings/formular` inkl. Aktiv/Inaktiv und Reihenfolge.
+- Automatische Preisberechnung (Grundpreis + Extras) + PDF-Export (Playwright) & E-Mail-Versand (Nodemailer); PDF/E-Mails spiegeln neue Labels/Felder wider, inkl. Bemerkungen / Unverträglichkeiten.
+- Adminpanel `/admin/*` mit NextAuth (Credentials + RBAC Admin/Mitarbeiter), Anfragenliste/-details, Statusworkflow, Audit-/Email-Logs, Einladungs-Management `/admin/invites`, Benutzerverwaltung; Auto-Logout pro ENV.
+- Cookie-Banner (Consent wird als Cookie/localStorage gespeichert) + statische DSGVO-Seiten `/impressum`, `/datenschutz`, `/cookies`; Footer-Links auf Public/Admin-Login.
+- Server Actions + Next.js Route-Handler, Prisma Schema inkl. User, ReservationRequest, Signature, EmailLog, InviteLink, AuditLog, ExtraOption. Deployment via Docker Compose (Next.js + PostgreSQL) hinter vorhandenem Reverse Proxy.
 
 ## Getting Started (Local Dev)
 
 1. **Voraussetzungen:** Node.js 20+, npm, Docker (für lokale DB) & Playwright-Dependencies (durch Dockerfile oder `npx playwright install --with-deps`).
 2. **ENV anlegen:** `cp .env.example .env` und Werte setzen (DATABASE_URL, NEXTAUTH_URL, SMTP usw.). Für lokale DB: `postgresql://postgres:postgres@localhost:5432/hkforms`. `INVITE_LINK_HOURS` steuert die Gültigkeit der Token-Links.
-   - Neue Invite-Variablen: `INVITE_TOKEN_SECRET`, `INVITE_DEFAULT_EXPIRY_DAYS`, `INVITE_REQUIRE_TOKEN` (Standard=true, Formular nur mit gültigem Invite).
+   - Invite: `INVITE_TOKEN_SECRET`, `INVITE_DEFAULT_EXPIRY_DAYS` (Formular ist immer token-geschützt; `INVITE_REQUIRE_TOKEN` bleibt nur für Abwärtskompatibilität in der ENV-Liste).
    - Preis/Session: `NEXT_PUBLIC_PRICE_PER_GUEST` (Grundpreis pro Person, wird auf Client & Server genutzt) und `AUTO_LOGOUT_MINUTES` (Auto-Logout im Adminbereich).
 3. **Dependencies installieren:** `npm install`.
 4. **Prisma vorbereiten:**
@@ -29,6 +28,10 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
    ```
 5. **Admin User anlegen:** `npm run create-admin` (fragt E-Mail/Passwort, legt Role=ADMIN an).
 6. **Entwicklung starten:** `npm run dev` (läuft auf http://localhost:3000, APP_URL/NEXTAUTH_URL entsprechend setzen).
+
+Nach den Migrationen stehen die neuen Felder (Gastgeberstruktur, Extras-Snapshot, Legacy-Backup) sowie die Tabelle `ExtraOption` bereit. Extras werden ausschließlich im Admin unter `/admin/settings/formular` gepflegt (aktiv/inaktiv, Preislogik, Reihenfolge). Ohne Einträge ist das Formular trotzdem absendbar.
+
+Statische Seiten `/impressum`, `/datenschutz`, `/cookies` enthalten Platzhalter („HIER TEXT EINTRAGEN“) und sollten vor Go-Live befüllt werden. Das Cookie-Banner speichert Consent in Cookie/localStorage und verweist auf diese Seiten.
 
 ### SMTP / E-Mail Hinweise
 

@@ -1,8 +1,28 @@
 import { chromium } from 'playwright';
 import { ReservationRequest, Signature } from '@prisma/client';
-import { calculatePricing, getExtraOptions } from './pricing';
+import { ExtraOptionInput, calculatePricing, parseExtrasSnapshot } from './pricing';
+import { prisma } from './prisma';
+import { mapExtraToInput } from '@/server/extras';
 
-function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }) {
+function parseSelectedExtraIds(value?: string | null) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+function buildHtml(
+  reservation: ReservationRequest & { signatures: Signature[] },
+  extrasOptions: ExtraOptionInput[],
+  selectedExtraIds: string[]
+) {
+  const legacy = (reservation as any).legacyData ?? {};
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
   const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const signatureImg = (sig?: Signature) =>
@@ -15,19 +35,23 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
   const price = (value?: any) =>
     value || value === 0 ? priceFormatter.format(Number(value ?? 0)) : '-';
 
-  const allowedExtras = new Map(getExtraOptions().map((extra) => [extra.id, extra]));
-  let selectedExtras: string[] = [];
-  if (reservation.extrasSelection) {
-    try {
-      const parsed = JSON.parse(reservation.extrasSelection);
-      if (Array.isArray(parsed)) {
-        selectedExtras = parsed.filter((item) => allowedExtras.has(item));
-      }
-    } catch {
-      selectedExtras = [];
-    }
-  }
-  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtras);
+  const hostName =
+    `${reservation.hostFirstName ?? ''} ${reservation.hostLastName ?? ''}`.trim() ||
+    reservation.guestName ||
+    (legacy.guestName as string) ||
+    '';
+  const hostEmail =
+    reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
+  const hostPhone =
+    reservation.hostPhone ?? reservation.guestPhone ?? (legacy.guestPhone as string) ?? '-';
+  const hostStreet =
+    reservation.hostStreet ?? reservation.guestAddress ?? (legacy.guestAddress as string) ?? '-';
+  const hostPostalAndCity =
+    [reservation.hostPostalCode ?? '', reservation.hostCity ?? ''].filter(Boolean).join(' ') ||
+    (legacy.guestAddress as string) ||
+    '-';
+
+  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtraIds, extrasOptions);
   const basePrice = reservation.priceEstimate ? Number(reservation.priceEstimate) : pricing.base;
   const totalPrice = reservation.totalPrice ? Number(reservation.totalPrice) : pricing.total;
   const extrasTotal = pricing.extrasTotal || Math.max(0, totalPrice - basePrice);
@@ -37,7 +61,7 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
           .map(
             (extra) =>
               `<li>${extra.label}${
-                extra.mode === 'per_person' ? ` (${extra.units} Pers.)` : ''
+                extra.pricingType === 'PER_PERSON' ? ` (${extra.units} Pers.)` : ''
               }: ${price(extra.total)}</li>`
           )
           .join('')}</ul>`
@@ -63,12 +87,13 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
     </header>
 
     <div class="section">
-      <h2>Kontakt</h2>
+      <h2>Gastgeber</h2>
       <table>
-        <tr><th>Gastgeber</th><td>${reservation.guestName}</td></tr>
-        <tr><th>E-Mail</th><td>${reservation.guestEmail}</td></tr>
-        <tr><th>Adresse</th><td>${reservation.guestAddress ?? '-'}</td></tr>
-        <tr><th>Telefon</th><td>${reservation.guestPhone ?? '-'}</td></tr>
+        <tr><th>Name</th><td>${hostName}</td></tr>
+        <tr><th>Straße + Nr.</th><td>${hostStreet}</td></tr>
+        <tr><th>PLZ / Ort</th><td>${hostPostalAndCity}</td></tr>
+        <tr><th>Telefon</th><td>${hostPhone}</td></tr>
+        <tr><th>E-Mail</th><td>${hostEmail}</td></tr>
       </table>
     </div>
 
@@ -76,8 +101,8 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
       <h2>Anlass</h2>
       <table>
         <tr><th>Anlass</th><td>${reservation.eventType}</td></tr>
-        <tr><th>Datum</th><td>${formatter.format(reservation.eventDate)}</td></tr>
-        <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime}</td></tr>
+        <tr><th>Veranstaltungsdatum</th><td>${formatter.format(reservation.eventDate)}</td></tr>
+        <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime ?? '22:30'}</td></tr>
         <tr><th>Personenzahl</th><td>${reservation.numberOfGuests}</td></tr>
       </table>
     </div>
@@ -91,16 +116,7 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
         <tr><th>Grundpreis</th><td>${price(basePrice)}</td></tr>
         <tr><th>Extras Summe</th><td>${price(extrasTotal)}</td></tr>
         <tr><th>Total</th><td>${price(totalPrice)}</td></tr>
-        <tr><th>Wünsche (Text)</th><td>${reservation.extras ?? '-'}</td></tr>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>Interne Informationen</h2>
-      <table>
-        <tr><th>Zuständig</th><td>${reservation.internalResponsible ?? '-'}</td></tr>
-        <tr><th>Status</th><td>${reservation.status}</td></tr>
-        <tr><th>Notizen</th><td>${reservation.internalNotes ?? '-'}</td></tr>
+        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${reservation.extras ?? '-'}</td></tr>
       </table>
     </div>
 
@@ -133,9 +149,24 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
 export async function reservationToPdf(
   reservation: ReservationRequest & { signatures: Signature[] }
 ) {
+  const extrasSnapshot = parseExtrasSnapshot(reservation.extrasSnapshot);
+  const selectedExtraIds = extrasSnapshot.length
+    ? extrasSnapshot.map((extra) => extra.id)
+    : parseSelectedExtraIds(reservation.extrasSelection);
+
+  let extrasOptions: ExtraOptionInput[] = extrasSnapshot;
+  if (!extrasOptions.length && selectedExtraIds.length) {
+    const extrasFromDb = await prisma.extraOption.findMany({
+      where: { id: { in: selectedExtraIds } }
+    });
+    extrasOptions = extrasFromDb.map(mapExtraToInput);
+  }
+
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  await page.setContent(buildHtml(reservation), { waitUntil: 'networkidle' });
+  await page.setContent(buildHtml(reservation, extrasOptions, selectedExtraIds), {
+    waitUntil: 'networkidle'
+  });
   const buffer = await page.pdf({
     format: 'A4',
     margin: { top: '24mm', left: '16mm', right: '16mm', bottom: '16mm' },

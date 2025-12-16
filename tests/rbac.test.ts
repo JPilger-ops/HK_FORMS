@@ -10,4 +10,12 @@ describe('rbac matrix', () => {
   it('allows admins to manage users', () => {
     expect(can('manage:users', Role.ADMIN)).toBe(true);
   });
+
+  it('prevents staff from managing settings', () => {
+    expect(can('manage:settings', Role.STAFF)).toBe(false);
+  });
+
+  it('allows admins to manage settings', () => {
+    expect(can('manage:settings', Role.ADMIN)).toBe(true);
+  });
 });

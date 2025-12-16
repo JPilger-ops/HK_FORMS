@@ -2,10 +2,21 @@ import { Role } from '@prisma/client';
 import { authOptions } from './auth';
 import { getServerSession } from 'next-auth';
 
-export type Permission = 'view:requests' | 'edit:requests' | 'manage:users' | 'send:emails';
+export type Permission =
+  | 'view:requests'
+  | 'edit:requests'
+  | 'manage:users'
+  | 'send:emails'
+  | 'manage:settings';
 
 const roleMatrix: Record<Role, Permission[]> = {
-  [Role.ADMIN]: ['view:requests', 'edit:requests', 'manage:users', 'send:emails'],
+  [Role.ADMIN]: [
+    'view:requests',
+    'edit:requests',
+    'manage:users',
+    'send:emails',
+    'manage:settings'
+  ],
   [Role.STAFF]: ['view:requests', 'edit:requests', 'send:emails']
 };
 

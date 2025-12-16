@@ -10,10 +10,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - hkforms
+      - hkforms    
+    ports:
+      - "5432:5432"
+  
 
   app:
-    build: .
+    image: hkforms:latest
     restart: unless-stopped
     depends_on:
       - db

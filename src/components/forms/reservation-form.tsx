@@ -6,12 +6,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ReservationInput, reservationSchema } from '@/lib/validation';
 import { SignaturePad } from './signature-pad';
 import { createReservationAction } from '@/server/actions/reservations';
-import { calculatePricing, getExtraOptions } from '@/lib/pricing';
+import { ExtraOptionInput, calculatePricing } from '@/lib/pricing';
 
-export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
+type Props = {
+  inviteToken?: string;
+  extrasOptions: ExtraOptionInput[];
+  enforcedEndTime?: string;
+};
+
+export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = '22:30' }: Props) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tokenValid, setTokenValid] = useState(true);
   const [isPending, startTransition] = useTransition();
   const {
     register,
@@ -22,21 +27,34 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
   } = useForm<ReservationInput>({
     resolver: zodResolver(reservationSchema),
     defaultValues: {
+      hostFirstName: '',
+      hostLastName: '',
+      hostStreet: '',
+      hostPostalCode: '',
+      hostCity: '',
+      hostPhone: '',
+      hostEmail: '',
+      eventEndTime: enforcedEndTime,
       signature: '',
       selectedExtras: [],
       priceEstimate: 0,
       totalPrice: 0,
-      privacyAccepted: false
+      privacyAccepted: false,
+      notes: ''
     }
   });
-  const extrasOptions = useMemo(() => getExtraOptions(), []);
+
   const guests = watch('numberOfGuests') ?? 0;
   const rawSelectedExtras = watch('selectedExtras');
   const selectedExtras = useMemo(() => {
     const value = rawSelectedExtras ?? [];
     return Array.isArray(value) ? value : [];
   }, [rawSelectedExtras]);
-  const pricing = useMemo(() => calculatePricing(guests, selectedExtras), [guests, selectedExtras]);
+
+  const pricing = useMemo(
+    () => calculatePricing(guests, selectedExtras, extrasOptions),
+    [extrasOptions, guests, selectedExtras]
+  );
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
     []
@@ -46,13 +64,10 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
   useEffect(() => {
     setValue('priceEstimate', pricing.base, { shouldValidate: true, shouldDirty: true });
     setValue('totalPrice', pricing.total, { shouldValidate: true, shouldDirty: true });
-  }, [pricing.base, pricing.total, setValue]);
+    setValue('eventEndTime', enforcedEndTime, { shouldValidate: true, shouldDirty: true });
+  }, [pricing.base, pricing.total, enforcedEndTime, setValue]);
 
   const onSubmit = (values: ReservationInput) => {
-    if (!tokenValid) {
-      setError('Einladungslink ist ungültig.');
-      return;
-    }
     startTransition(async () => {
       const result = await createReservationAction(values, { inviteToken });
       if (result.success) {
@@ -70,26 +85,6 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
     });
   };
 
-  useEffect(() => {
-    if (!inviteToken) return;
-    const validate = async () => {
-      try {
-        const res = await fetch(`/api/invites/validate?token=${encodeURIComponent(inviteToken)}`);
-        if (!res.ok) {
-          setTokenValid(false);
-          setError('Einladungslink ist ungültig oder abgelaufen.');
-        } else {
-          setTokenValid(true);
-          setError(null);
-        }
-      } catch {
-        setTokenValid(false);
-        setError('Einladungslink ist ungültig oder abgelaufen.');
-      }
-    };
-    validate();
-  }, [inviteToken]);
-
   if (success) {
     return (
       <div className="rounded border border-emerald-200 bg-emerald-50 p-6 text-emerald-800">
@@ -104,63 +99,92 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
       <input type="hidden" {...register('signature')} />
       <section className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Gastgeber*</label>
-          <input {...register('guestName')} className="mt-1 w-full rounded border px-3 py-2" />
-          {errors.guestName && <p className="text-sm text-red-600">{errors.guestName.message}</p>}
+          <label className="block text-sm font-medium text-slate-600">Vorname*</label>
+          <input {...register('hostFirstName')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostFirstName && (
+            <p className="text-sm text-red-600">{errors.hostFirstName.message}</p>
+          )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">E-Mail*</label>
-          <input
-            type="email"
-            {...register('guestEmail')}
-            className="mt-1 w-full rounded border px-3 py-2"
-          />
-          {errors.guestEmail && <p className="text-sm text-red-600">{errors.guestEmail.message}</p>}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600">Telefon</label>
-          <input {...register('guestPhone')} className="mt-1 w-full rounded border px-3 py-2" />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-600">
-            Adresse des Gastgebers*
-          </label>
-          <textarea
-            {...register('guestAddress')}
-            className="mt-1 w-full rounded border px-3 py-2"
-            rows={2}
-            placeholder="Straße, Hausnummer, PLZ und Ort"
-          />
-          {errors.guestAddress && (
-            <p className="text-sm text-red-600">{errors.guestAddress.message}</p>
+          <label className="block text-sm font-medium text-slate-600">Nachname*</label>
+          <input {...register('hostLastName')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostLastName && (
+            <p className="text-sm text-red-600">{errors.hostLastName.message}</p>
           )}
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-600">Straße + Hausnummer*</label>
+          <input {...register('hostStreet')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostStreet && <p className="text-sm text-red-600">{errors.hostStreet.message}</p>}
+        </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Datum*</label>
+          <label className="block text-sm font-medium text-slate-600">PLZ*</label>
+          <input {...register('hostPostalCode')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostPostalCode && (
+            <p className="text-sm text-red-600">{errors.hostPostalCode.message}</p>
+          )}
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-600">Ort*</label>
+          <input {...register('hostCity')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostCity && <p className="text-sm text-red-600">{errors.hostCity.message}</p>}
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-slate-600">Telefon*</label>
+          <input
+            type="tel"
+            {...register('hostPhone')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
+          {errors.hostPhone && <p className="text-sm text-red-600">{errors.hostPhone.message}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600">E-Mail*</label>
+          <input
+            type="email"
+            {...register('hostEmail')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
+          {errors.hostEmail && <p className="text-sm text-red-600">{errors.hostEmail.message}</p>}
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-600">Veranstaltungsdatum*</label>
           <input
             type="date"
             {...register('eventDate')}
             className="mt-1 w-full rounded border px-3 py-2"
           />
+          {errors.eventDate && <p className="text-sm text-red-600">{errors.eventDate.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Start*</label>
+          <label className="block text-sm font-medium text-slate-600">Start Uhrzeit*</label>
           <input
             type="time"
             {...register('eventStartTime')}
             className="mt-1 w-full rounded border px-3 py-2"
           />
+          {errors.eventStartTime && (
+            <p className="text-sm text-red-600">{errors.eventStartTime.message}</p>
+          )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Ende*</label>
+          <label className="block text-sm font-medium text-slate-600">End Uhrzeit</label>
           <input
             type="time"
-            {...register('eventEndTime')}
-            className="mt-1 w-full rounded border px-3 py-2"
+            readOnly
+            value={enforcedEndTime}
+            className="mt-1 w-full rounded border px-3 py-2 bg-slate-100 text-slate-600"
           />
+          <input type="hidden" {...register('eventEndTime')} />
         </div>
       </section>
 
@@ -168,6 +192,7 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         <div>
           <label className="block text-sm font-medium text-slate-600">Anlass*</label>
           <input {...register('eventType')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.eventType && <p className="text-sm text-red-600">{errors.eventType.message}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">Personenzahl*</label>
@@ -177,6 +202,9 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
             {...register('numberOfGuests', { valueAsNumber: true })}
             className="mt-1 w-full rounded border px-3 py-2"
           />
+          {errors.numberOfGuests && (
+            <p className="text-sm text-red-600">{errors.numberOfGuests.message}</p>
+          )}
         </div>
       </section>
 
@@ -185,9 +213,8 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
           <label className="block text-sm font-medium text-slate-600">Zahlungsart*</label>
           <select {...register('paymentMethod')} className="mt-1 w-full rounded border px-3 py-2">
             <option value="">Bitte wählen</option>
-            <option>Rechnung</option>
-            <option>Barzahlung</option>
-            <option>Kreditkarte</option>
+            <option value="Rechnung">Rechnung</option>
+            <option value="Barzahlung">Barzahlung</option>
           </select>
           {errors.paymentMethod && (
             <p className="text-sm text-red-600">{errors.paymentMethod.message}</p>
@@ -195,12 +222,12 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">
-            Weitere Wünsche (werden nicht bepreist)
+            Bemerkungen / Unverträglichkeiten
           </label>
           <textarea
-            {...register('extras')}
+            {...register('notes')}
             className="mt-1 w-full rounded border px-3 py-2"
-            rows={3}
+            rows={8}
           />
         </div>
       </section>
@@ -217,6 +244,12 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
             Mehrfachauswahl möglich. Beträge werden automatisch in die Gesamtsumme übernommen.
           </p>
           <div className="mt-3 space-y-3">
+            {extrasOptions.length === 0 && (
+              <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                Es sind aktuell keine Extras hinterlegt. Das Formular kann trotzdem abgesendet
+                werden.
+              </p>
+            )}
             {extrasOptions.map((option) => (
               <label
                 key={option.id}
@@ -232,9 +265,9 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
                   <p className="font-medium">
                     {option.label}{' '}
                     <span className="text-sm font-normal text-slate-500">
-                      {option.mode === 'per_person'
-                        ? `${formatCurrency(option.price)} pro Person`
-                        : `${formatCurrency(option.price)} pauschal`}
+                      {option.pricingType === 'PER_PERSON'
+                        ? `${formatCurrency(option.priceCents / 100)} pro Person`
+                        : `${formatCurrency(option.priceCents / 100)} pauschal`}
                     </span>
                   </p>
                   {option.description && (
@@ -272,7 +305,7 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
                     <li key={extra.id} className="flex justify-between">
                       <span>
                         {extra.label}
-                        {extra.mode === 'per_person' ? ` (${extra.units} Pers.)` : ''}
+                        {extra.pricingType === 'PER_PERSON' ? ` (${extra.units} Pers.)` : ''}
                       </span>
                       <span>{formatCurrency(extra.total)}</span>
                     </li>
@@ -292,24 +325,6 @@ export function ReservationForm({ inviteToken }: { inviteToken?: string }) {
 
       <input type="hidden" {...register('priceEstimate', { valueAsNumber: true })} />
       <input type="hidden" {...register('totalPrice', { valueAsNumber: true })} />
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-slate-600">Zuständig (Team)</label>
-          <input
-            {...register('internalResponsible')}
-            className="mt-1 w-full rounded border px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600">Bemerkungen</label>
-          <textarea
-            {...register('internalNotes')}
-            className="mt-1 w-full rounded border px-3 py-2"
-            rows={2}
-          />
-        </div>
-      </section>
 
       <section>
         <label className="block text-sm font-medium text-slate-600">DSGVO & Einwilligung*</label>

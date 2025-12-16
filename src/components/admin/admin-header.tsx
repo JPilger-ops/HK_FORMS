@@ -47,6 +47,7 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
     () => data?.user?.email ?? data?.user?.id ?? '',
     [data?.user?.email, data?.user?.id]
   );
+  const isAdmin = data?.user?.role === 'ADMIN';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -65,9 +66,16 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
           <Link href="/admin/invites" className="text-brand hover:underline">
             Einladungen
           </Link>
-          <Link href="/admin/users" className="text-brand hover:underline">
-            Benutzer
-          </Link>
+          {isAdmin && (
+            <Link href="/admin/settings" className="text-brand hover:underline">
+              Einstellungen
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin/users" className="text-brand hover:underline">
+              Benutzer
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: '/admin/login' })}

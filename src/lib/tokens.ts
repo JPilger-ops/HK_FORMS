@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from './prisma';
-import { addDays, isBefore } from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { isBefore } from 'date-fns/isBefore';
 
 const defaultInviteDays = Number(process.env.INVITE_DEFAULT_EXPIRY_DAYS ?? 7) || 7;
 
