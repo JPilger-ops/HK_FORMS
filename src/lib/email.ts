@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
-import { getBaseUrl } from './auth';
+import { getPublicFormBaseUrl } from './auth';
 
 export async function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -76,7 +76,7 @@ export async function sendInviteEmail({
   appUrl?: string;
 }) {
   const transporter = await getTransporter();
-  const base = (appUrl || getBaseUrl()).replace(/\/$/, '');
+  const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
   const link = `${base}/request?token=${encodeURIComponent(token)}&form=${encodeURIComponent(formKey)}`;
   const html = `<p>Bitte füllen Sie Ihre Reservierungsanfrage aus.</p><p><a href="${link}" style="padding:10px 14px;background:#39523a;color:white;border-radius:6px;text-decoration:none;">Formular öffnen</a></p><p>Alternativ: ${link}</p>`;
   try {

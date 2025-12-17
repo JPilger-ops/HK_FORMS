@@ -12,29 +12,85 @@ function AutoLogout({ minutes }: { minutes: number }) {
   useEffect(() => {
     const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
     const timeoutMs = safeMinutes * 60 * 1000;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    const storageKey = 'hkforms:last-activity';
+    let signedOut = false;
+    let lastActivity = Date.now();
 
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        signOut({ callbackUrl: '/admin/login' });
-      }, timeoutMs);
+    const writeActivity = (value: number) => {
+      lastActivity = value;
+      try {
+        localStorage.setItem(storageKey, String(value));
+      } catch (error) {
+        console.warn('Could not persist activity timestamp', error);
+      }
     };
 
-    const reset = () => schedule();
+    const readActivity = () => {
+      try {
+        const stored = Number(localStorage.getItem(storageKey));
+        return Number.isFinite(stored) ? stored : lastActivity;
+      } catch {
+        return lastActivity;
+      }
+    };
+
+    const signOutNow = () => {
+      if (signedOut) return;
+      signedOut = true;
+      signOut({ callbackUrl: '/admin/login' });
+    };
+
+    const checkIdle = () => {
+      const last = readActivity();
+      if (Date.now() - last >= timeoutMs) {
+        signOutNow();
+      }
+    };
+
+    const noteActivity = () => {
+      if (signedOut) return;
+      writeActivity(Date.now());
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkIdle();
+        noteActivity();
+      }
+    };
+
+    writeActivity(lastActivity);
+
     const events: Array<keyof WindowEventMap> = [
       'mousemove',
       'keydown',
       'click',
       'scroll',
-      'focus'
+      'focus',
+      'touchstart'
     ];
-    events.forEach((evt) => window.addEventListener(evt, reset));
-    schedule();
+    events.forEach((evt) => window.addEventListener(evt, noteActivity));
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('storage', (event) => {
+      if (event.key === storageKey && event.newValue) {
+        const parsed = Number(event.newValue);
+        if (Number.isFinite(parsed)) {
+          lastActivity = parsed;
+          checkIdle();
+        }
+      }
+    });
+
+    const interval = window.setInterval(
+      checkIdle,
+      Math.min(60000, Math.max(5000, Math.floor(timeoutMs / 4)))
+    );
+    checkIdle();
 
     return () => {
-      if (timer) clearTimeout(timer);
-      events.forEach((evt) => window.removeEventListener(evt, reset));
+      clearInterval(interval);
+      events.forEach((evt) => window.removeEventListener(evt, noteActivity));
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [minutes]);
 
@@ -48,6 +104,8 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
     [data?.user?.email, data?.user?.id]
   );
   const isAdmin = data?.user?.role === 'ADMIN';
+  const navButtonClasses =
+    'inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-white/90 via-white/85 to-white/70 px-4 py-2 text-sm font-medium text-brand shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)] ring-1 ring-white/70 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.45)] active:translate-y-0';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -59,27 +117,27 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
         </p>
       </div>
       <div className="flex flex-col items-end gap-2">
-        <nav className="flex flex-wrap items-center justify-end gap-3 text-sm">
-          <Link href="/admin/requests" className="text-brand hover:underline">
+        <nav className="flex flex-wrap items-center justify-end gap-2 rounded-full bg-white/30 px-2 py-1 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
+          <Link href="/admin/requests" className={navButtonClasses}>
             Anfragen
           </Link>
-          <Link href="/admin/invites" className="text-brand hover:underline">
+          <Link href="/admin/invites" className={navButtonClasses}>
             Einladungen
           </Link>
           {isAdmin && (
-            <Link href="/admin/settings" className="text-brand hover:underline">
+            <Link href="/admin/settings" className={navButtonClasses}>
               Einstellungen
             </Link>
           )}
           {isAdmin && (
-            <Link href="/admin/users" className="text-brand hover:underline">
+            <Link href="/admin/users" className={navButtonClasses}>
               Benutzer
             </Link>
           )}
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: '/admin/login' })}
-            className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 transition hover:bg-slate-100"
+            className={`${navButtonClasses} text-slate-800`}
           >
             Logout {userLabel ? `(${userLabel})` : ''}
           </button>

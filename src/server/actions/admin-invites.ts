@@ -4,7 +4,7 @@ import { assertPermission } from '@/lib/rbac';
 import { createInviteLink, validateInviteToken } from '@/lib/tokens';
 import { sendInviteEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
-import { getBaseUrl } from '@/lib/auth';
+import { getPublicFormBaseUrl } from '@/lib/auth';
 
 export async function createAndSendInviteAction({
   recipientEmail,
@@ -23,6 +23,7 @@ export async function createAndSendInviteAction({
   if (!recipientEmail) {
     throw new Error('Recipient required');
   }
+  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
   const { token, invite } = await createInviteLink({
     formKey,
     createdByUserId: session.user?.id,
@@ -36,9 +37,9 @@ export async function createAndSendInviteAction({
     to: recipientEmail,
     token,
     formKey,
-    appUrl: getBaseUrl()
+    appUrl: formBase
   });
-  return { inviteId: invite.id, link: `${getBaseUrl().replace(/\/$/, '')}/request?token=${token}` };
+  return { inviteId: invite.id, link: `${formBase}/request?token=${token}` };
 }
 
 export async function revokeInviteAction(inviteId: string) {
@@ -55,6 +56,7 @@ export async function resendInviteAction(inviteId: string) {
   if (!invite || !invite.recipientEmail) {
     throw new Error('Invite not found or no recipient');
   }
+  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
   const { token, invite: newInvite } = await createInviteLink({
     formKey: invite.formKey,
     createdByUserId: session.user?.id,
@@ -70,11 +72,11 @@ export async function resendInviteAction(inviteId: string) {
     to: invite.recipientEmail,
     token,
     formKey: invite.formKey,
-    appUrl: getBaseUrl()
+    appUrl: formBase
   });
   return {
     inviteId: newInvite.id,
-    link: `${getBaseUrl().replace(/\/$/, '')}/request?token=${token}`
+    link: `${formBase}/request?token=${token}`
   };
 }
 

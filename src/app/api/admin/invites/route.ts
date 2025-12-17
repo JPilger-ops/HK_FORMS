@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { assertPermission } from '@/lib/rbac';
 import { createInviteLink } from '@/lib/tokens';
 import { sendInviteEmail } from '@/lib/email';
-import { getBaseUrl } from '@/lib/auth';
+import { getPublicFormBaseUrl } from '@/lib/auth';
 
 export async function POST(request: Request) {
   const session = await assertPermission('send:emails');
@@ -26,13 +26,14 @@ export async function POST(request: Request) {
     maxUses
   });
 
-  const link = `${getBaseUrl().replace(/\/$/, '')}/request?token=${encodeURIComponent(token)}`;
+  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
+  const link = `${formBase}/request?token=${encodeURIComponent(token)}`;
   await sendInviteEmail({
     inviteId: invite.id,
     to: recipientEmail,
     token,
     formKey,
-    appUrl: getBaseUrl()
+    appUrl: formBase
   });
 
   return NextResponse.json({ inviteId: invite.id, link });

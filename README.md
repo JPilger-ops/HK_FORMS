@@ -15,7 +15,7 @@ Digitale Reservierungsverwaltung für die Waldwirtschaft Heidekönig. Gäste kö
 ## Getting Started (Local Dev)
 
 1. **Voraussetzungen:** Node.js 20+, npm, Docker (für lokale DB) & Playwright-Dependencies (durch Dockerfile oder `npx playwright install --with-deps`).
-2. **ENV anlegen:** `cp .env.example .env` und Werte setzen (DATABASE_URL, NEXTAUTH_URL, SMTP usw.). Für lokale DB: `postgresql://postgres:postgres@localhost:5432/hkforms`. `INVITE_LINK_HOURS` steuert die Gültigkeit der Token-Links.
+2. **ENV anlegen:** `cp .env.example .env` und Werte setzen (DATABASE_URL, NEXTAUTH_URL, SMTP usw.). Für lokale DB: `postgresql://postgres:postgres@localhost:5432/hkforms`. `INVITE_LINK_HOURS` steuert die Gültigkeit der Token-Links. Admin läuft auf `APP_URL/ADMIN_BASE_URL` (z. B. `https://app.bistrottelegraph.de`), das öffentliche Formular auf `PUBLIC_FORM_URL` (z. B. `https://forms.bistrottelegraph.de`). `ENFORCE_DOMAIN_ROUTING=true` sorgt im Production-Mode dafür, dass `/admin` & `/api/auth/*` auf die Admin-Domain umgeleitet werden und `/request` auf die Formular-Domain.
    - Invite: `INVITE_TOKEN_SECRET`, `INVITE_DEFAULT_EXPIRY_DAYS` (Formular ist immer token-geschützt; `INVITE_REQUIRE_TOKEN` bleibt nur für Abwärtskompatibilität in der ENV-Liste).
    - Preis/Session: `NEXT_PUBLIC_PRICE_PER_GUEST` (Grundpreis pro Person, wird auf Client & Server genutzt) und `AUTO_LOGOUT_MINUTES` (Auto-Logout im Adminbereich).
 3. **Dependencies installieren:** `npm install`.
@@ -57,10 +57,10 @@ Statische Seiten `/impressum`, `/datenschutz`, `/cookies` enthalten Platzhalter 
    - Standard-Host laut Vorgabe: App auf `192.168.60.100:3000`, Proxy auf `192.168.50.100`.
 
 3. **Reverse Proxy Manager (bestehender NGINX bei 192.168.50.100):**
-   - Forward Host/IP: `192.168.60.100` (App-Server), Port `3000` (oder freigegebenen Compose-Port).
-   - SSL/TLS-Termination im Proxy aktivieren (LetsEncrypt), HTTP→HTTPS redirect erzwingen.
-   - Unter „Custom Nginx Config“ sicherstellen, dass `X-Forwarded-For` & `X-Forwarded-Proto` gesetzt werden. NextAuth vertraut den Headern (`trustHost`), Cookies sind `Secure` im Production-Mode.
-   - `APP_URL`/`NEXTAUTH_URL` unbedingt auf die externe https-URL setzen, damit Cookies & Invite-Links stimmen.
+   - Zwei Hosts anlegen: `forms.bistrottelegraph.de` (public `/request`) und `app.bistrottelegraph.de` (Admin + `/api/auth`). Beide dürfen auf denselben Container/Port (`192.168.60.100:3000`) zeigen; das Routing pro Pfad übernimmt die Middleware, wenn `ENFORCE_DOMAIN_ROUTING` aktiv ist.
+   - SSL/TLS-Termination im Proxy aktivieren (LetsEncrypt oder Cloudflare-Origin-Zertifikat), HTTP→HTTPS redirect erzwingen. In Nginx Proxy Manager unter „Custom Nginx Config“ `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` und `Host` setzen/erben lassen. NextAuth vertraut den Headern (`trustHost`), Cookies sind `Secure` im Production-Mode.
+   - Cloudflare: Proxy kann aktiv sein (orange cloud). Im DNS „Full (strict)“ wählen, Firewall nur Cloudflare-IP-Ranges zulassen. Optional im Nginx-Advanced-Config `real_ip_header CF-Connecting-IP;` und die Cloudflare-Netze (`set_real_ip_from ...`) hinterlegen, damit Rate-Limiting/Audit die echte Client-IP sieht.
+   - `APP_URL`/`ADMIN_BASE_URL`/`NEXTAUTH_URL` auf die Admin-Domain und `PUBLIC_FORM_URL` auf die Formular-Domain setzen, damit Invite-Links, Cookies & Redirects passen.
 4. **Trusted Proxy Hinweise:** Wenn der Proxy auf 192.168.50.100 sitzt und die App auf 192.168.60.100, sollten Firewall-Regeln nur Verkehr vom Proxy erlauben. In Kubernetes/PM2-Szenarien unbedingt `X-Forwarded-*` pflegen, damit Rate Limiting & Logs IPs korrekt sehen.
 
 ## Datenbank: Backup & Restore

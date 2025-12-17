@@ -38,9 +38,20 @@ export function RequestDetailActions({ reservationId, currentStatus, appUrl }: P
       .map((v) => v.trim())
       .filter(Boolean);
     if (!to?.length) return;
+    const confirmationLabel = to.join(', ');
+    const confirmed = window.confirm(
+      `PDF wirklich an ${confirmationLabel} senden? Der Versand wird protokolliert.`
+    );
+    if (!confirmed) return;
+    setMessage(null);
     startTransition(async () => {
-      await sendReservationEmailAction(reservationId, to);
-      setMessage('E-Mail gesendet');
+      try {
+        await sendReservationEmailAction(reservationId, to);
+        setMessage('E-Mail gesendet');
+      } catch (error) {
+        console.error(error);
+        setMessage('E-Mail konnte nicht gesendet werden.');
+      }
     });
   };
 

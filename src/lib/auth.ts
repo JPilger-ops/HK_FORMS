@@ -116,20 +116,52 @@ export async function getSessionUser() {
   return session?.user;
 }
 
-export function getBaseUrl() {
+function normalizeUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return null;
+  }
+}
+
+function headerBaseUrl() {
   const h = headers();
   const proto = h.get('x-forwarded-proto');
   const forwardedHost = h.get('x-forwarded-host');
   const host = h.get('host');
-  const headerUrl = proto && (forwardedHost || host) ? `${proto}://${forwardedHost || host}` : null;
+  return proto && (forwardedHost || host) ? `${proto}://${forwardedHost || host}` : null;
+}
+
+const localFallback = `http://localhost:${process.env.PORT ?? 3000}`;
+
+export function getAdminBaseUrl() {
   const cookie = cookies().get('APP_URL')?.value;
   return (
-    headerUrl ||
-    cookie ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    `http://localhost:${process.env.PORT ?? 3000}`
+    headerBaseUrl() ||
+    normalizeUrl(cookie) ||
+    normalizeUrl(process.env.ADMIN_BASE_URL) ||
+    normalizeUrl(process.env.APP_URL) ||
+    normalizeUrl(process.env.NEXTAUTH_URL) ||
+    localFallback
   ).replace(/\/$/, '');
+}
+
+export function getPublicFormBaseUrl() {
+  return (
+    normalizeUrl(process.env.PUBLIC_FORM_URL) ||
+    normalizeUrl(process.env.FORM_BASE_URL) ||
+    normalizeUrl(process.env.NEXT_PUBLIC_FORM_URL) ||
+    normalizeUrl(process.env.APP_URL) ||
+    normalizeUrl(process.env.NEXTAUTH_URL) ||
+    normalizeUrl(headerBaseUrl()) ||
+    localFallback
+  ).replace(/\/$/, '');
+}
+
+export function getBaseUrl() {
+  return getAdminBaseUrl();
 }
 
 export const getTrustedProxyHeaders = getBaseUrl;

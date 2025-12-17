@@ -35,3 +35,4 @@ prisma/*.db
 
 # docker
 *.pid
+test.0.0

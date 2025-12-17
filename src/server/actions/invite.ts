@@ -3,7 +3,7 @@
 import { assertPermission } from '@/lib/rbac';
 import { createInviteLink } from '@/lib/tokens';
 import { sendInviteEmail } from '@/lib/email';
-import { getBaseUrl } from '@/lib/auth';
+import { getPublicFormBaseUrl } from '@/lib/auth';
 
 const defaultDays = Number(process.env.INVITE_DEFAULT_EXPIRY_DAYS ?? 7) || 7;
 
@@ -40,7 +40,7 @@ export async function sendInviteLinkEmailAction({
     recipientEmail: recipient,
     expiresInDays: expiresInDays ?? defaultDays
   });
-  const base = (appUrl || getBaseUrl()).replace(/\/$/, '');
+  const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
   await sendInviteEmail({
     inviteId: invite.id,
     to: recipient,
