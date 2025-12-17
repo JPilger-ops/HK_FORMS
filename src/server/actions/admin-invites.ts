@@ -88,6 +88,17 @@ export async function listInvitesAction(limit = 50) {
   });
 }
 
+export async function deleteInvitesAction(inviteIds: string[]) {
+  await assertPermission('edit:requests');
+  const ids = inviteIds.filter(Boolean);
+  if (!ids.length) return { deleted: 0 };
+  const result = await prisma.inviteLink.updateMany({
+    where: { id: { in: ids } },
+    data: { isRevoked: true }
+  });
+  return { deleted: result.count };
+}
+
 export async function validateInviteForApi(token: string) {
   return validateInviteToken(token);
 }

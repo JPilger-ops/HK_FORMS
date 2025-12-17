@@ -103,6 +103,7 @@ function buildHtml(
         <tr><th>Anlass</th><td>${reservation.eventType}</td></tr>
         <tr><th>Veranstaltungsdatum</th><td>${formatter.format(reservation.eventDate)}</td></tr>
         <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime ?? '22:30'}</td></tr>
+        <tr><th>Start Essen</th><td>${reservation.startMeal ?? '-'}</td></tr>
         <tr><th>Personenzahl</th><td>${reservation.numberOfGuests}</td></tr>
       </table>
     </div>
@@ -137,6 +138,20 @@ function buildHtml(
             : 'Keine Einwilligung hinterlegt (Bestandseintrag oder manuelle Erfassung).'
         }
       </p>
+      <p>
+        ${
+          reservation.termsAcceptedAt
+            ? `Reservierungsbedingungen bestätigt am ${reservation.termsAcceptedAt.toLocaleString(
+                'de-DE'
+              )}`
+            : 'Keine Bestätigung der Reservierungsbedingungen hinterlegt.'
+        }
+      </p>
+      ${
+        reservation.termsSnapshot
+          ? `<div style="margin-top:8px;padding:8px;border:1px solid #e5e7eb;background:#f9fafb;"><strong>Bestätigte Bedingungen:</strong><div style="white-space:pre-line;margin-top:4px;">${reservation.termsSnapshot}</div></div>`
+          : ''
+      }
     </div>
 
     <footer>

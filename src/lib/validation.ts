@@ -17,6 +17,7 @@ export const reservationSchema = z.object({
   eventType: z.string().min(2, 'Bitte Anlass angeben'),
   eventStartTime: z.string(),
   eventEndTime: z.string().default('22:30'),
+  startMeal: z.string().min(1, 'Bitte Startessen angeben'),
   numberOfGuests: z.coerce.number().min(1, 'Personenzahl erforderlich'),
   paymentMethod: z.enum(['Rechnung', 'Barzahlung'], {
     required_error: 'Zahlungsart erforderlich'
@@ -28,6 +29,9 @@ export const reservationSchema = z.object({
   privacyAccepted: z
     .boolean()
     .refine((value) => value === true, 'Bitte bestätigen Sie die Datenschutzhinweise.'),
+  termsAccepted: z
+    .boolean()
+    .refine((value) => value === true, 'Bitte bestätigen Sie die Reservierungsbedingungen.'),
   signature: z.string().min(10)
 });
 

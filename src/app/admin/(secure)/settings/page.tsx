@@ -17,6 +17,16 @@ export default async function SettingsPage() {
             Formular & Extras
           </Link>
         </li>
+        <li>
+          <Link href="/admin/settings/bedingungen" className="text-brand underline">
+            Reservierungsbedingungen
+          </Link>
+        </li>
+        <li>
+          <Link href="/admin/settings/deposit" className="text-brand underline">
+            Anzahlung
+          </Link>
+        </li>
       </ul>
     </AdminShell>
   );

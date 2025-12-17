@@ -12,12 +12,21 @@ type Props = {
   inviteToken?: string;
   extrasOptions: ExtraOptionInput[];
   enforcedEndTime?: string;
+  termsText: string;
+  depositSettings: { enabled: boolean; amount: number };
 };
 
-export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = '22:30' }: Props) {
+export function ReservationForm({
+  inviteToken,
+  extrasOptions,
+  enforcedEndTime = '22:30',
+  termsText,
+  depositSettings
+}: Props) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showTerms, setShowTerms] = useState(false);
   const {
     register,
     handleSubmit,
@@ -35,11 +44,13 @@ export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = 
       hostPhone: '',
       hostEmail: '',
       eventEndTime: enforcedEndTime,
+      startMeal: '',
       signature: '',
       selectedExtras: [],
       priceEstimate: 0,
       totalPrice: 0,
       privacyAccepted: false,
+      termsAccepted: false,
       notes: ''
     }
   });
@@ -175,6 +186,15 @@ export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = 
           {errors.eventStartTime && (
             <p className="text-sm text-red-600">{errors.eventStartTime.message}</p>
           )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600">Start Essen*</label>
+          <input
+            type="time"
+            {...register('startMeal')}
+            className="mt-1 w-full rounded border px-3 py-2"
+          />
+          {errors.startMeal && <p className="text-sm text-red-600">{errors.startMeal.message}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600">End Uhrzeit</label>
@@ -319,6 +339,12 @@ export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = 
               <dt>Gesamtsumme</dt>
               <dd>{formatCurrency(pricing.total)}</dd>
             </div>
+            {depositSettings.enabled && (
+              <div className="flex justify-between text-sm text-slate-700">
+                <dt>Anzahlung</dt>
+                <dd className="font-medium">{formatCurrency(depositSettings.amount)}</dd>
+              </div>
+            )}
           </dl>
         </div>
       </section>
@@ -341,6 +367,40 @@ export function ReservationForm({ inviteToken, extrasOptions, enforcedEndTime = 
         </div>
         {errors.privacyAccepted && (
           <p className="text-sm text-red-600">{errors.privacyAccepted.message as string}</p>
+        )}
+      </section>
+
+      <section>
+        <label className="block text-sm font-medium text-slate-600">
+          Reservierungsbedingungen*
+        </label>
+        <div className="mt-2 space-y-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-slate-700">Ich akzeptiere die Reservierungsbedingungen.</p>
+            <button
+              type="button"
+              onClick={() => setShowTerms((prev) => !prev)}
+              className="text-sm text-brand underline"
+            >
+              {showTerms ? 'Weniger' : 'Mehr'}
+            </button>
+          </div>
+          {showTerms && (
+            <div className="rounded border border-slate-200 bg-white/70 p-3 text-sm text-slate-700">
+              <div className="whitespace-pre-line">{termsText}</div>
+            </div>
+          )}
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              {...register('termsAccepted')}
+              className="mt-1 h-4 w-4 rounded border-slate-400"
+            />
+            <span>Ich akzeptiere die Reservierungsbedingungen.</span>
+          </label>
+        </div>
+        {errors.termsAccepted && (
+          <p className="text-sm text-red-600">{errors.termsAccepted.message as string}</p>
         )}
       </section>
 

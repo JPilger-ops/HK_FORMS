@@ -20,6 +20,7 @@ const mockReservation = {
   eventType: 'Geburtstag',
   eventStartTime: '18:00',
   eventEndTime: '23:00',
+  startMeal: '19:00',
   numberOfGuests: 10,
   paymentMethod: 'Rechnung',
   extrasSelection: '[]',
@@ -29,6 +30,8 @@ const mockReservation = {
   internalResponsible: null,
   internalNotes: null,
   privacyAcceptedAt: new Date(),
+  termsAcceptedAt: new Date(),
+  termsSnapshot: 'Bedingungen',
   signatures: []
 };
 
@@ -102,11 +105,13 @@ describe('createReservationAction', () => {
         eventType: 'Feier',
         eventStartTime: '18:00',
         eventEndTime: '23:00',
+        startMeal: '19:00',
         numberOfGuests: 20,
         paymentMethod: 'Rechnung',
         selectedExtras: ['drinks'],
         notes: 'Musik',
         privacyAccepted: true,
+        termsAccepted: true,
         signature: 'data:image/png;base64,ZmFrZQ=='
       },
       { inviteToken: 'token-abc' }
@@ -129,11 +134,13 @@ describe('createReservationAction', () => {
         eventType: 'Feier',
         eventStartTime: '18:00',
         eventEndTime: '20:00',
+        startMeal: '19:00',
         numberOfGuests: 10,
         paymentMethod: 'Rechnung',
         selectedExtras: [],
         notes: '',
         privacyAccepted: true,
+        termsAccepted: true,
         signature: 'data:image/png;base64,ZmFrZQ=='
       },
       { inviteToken: 'token-abc' }
@@ -156,11 +163,13 @@ describe('createReservationAction', () => {
         eventType: 'Feier',
         eventStartTime: '18:00',
         eventEndTime: '20:00',
+        startMeal: '19:00',
         numberOfGuests: 10,
         paymentMethod: 'Rechnung',
         selectedExtras: ['drinks'],
         notes: '',
         privacyAccepted: true,
+        termsAccepted: true,
         signature: 'data:image/png;base64,ZmFrZQ=='
       },
       { inviteToken: 'token-abc' }
@@ -196,11 +205,13 @@ describe('createReservationAction', () => {
         eventType: 'Feier',
         eventStartTime: '18:00',
         eventEndTime: '20:00',
+        startMeal: '19:00',
         numberOfGuests: 10,
         paymentMethod: 'Rechnung',
         selectedExtras: [],
         notes: '',
         privacyAccepted: true,
+        termsAccepted: true,
         signature: 'data:image/png;base64,ZmFrZQ=='
       },
       { inviteToken: 'token-abc' }

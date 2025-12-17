@@ -15,6 +15,7 @@ import {
   ExtraOptionInput,
   parseExtrasSnapshot
 } from '@/lib/pricing';
+import { getReservationTerms } from '@/lib/settings';
 
 const ENFORCED_END_TIME = '22:30';
 
@@ -82,6 +83,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   const pricing = calculatePricing(data.numberOfGuests, validExtras, extrasOptions);
   const hostFullName = `${data.hostFirstName} ${data.hostLastName}`.trim();
   const hostAddress = formatHostAddress(data);
+  const termsText = await getReservationTerms();
 
   type ReservationWithSignatures = Prisma.ReservationRequestGetPayload<{
     include: { signatures: true };
@@ -107,6 +109,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
           eventType: data.eventType,
           eventStartTime: data.eventStartTime,
           eventEndTime: ENFORCED_END_TIME,
+          startMeal: data.startMeal,
           numberOfGuests: data.numberOfGuests,
           paymentMethod: data.paymentMethod,
           extrasSelection: validExtras.length ? JSON.stringify(validExtras) : null,
@@ -116,12 +119,14 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
           extras: data.notes,
           priceEstimate: normalizeNumber(pricing.base),
           totalPrice: normalizeNumber(pricing.total),
-          privacyAcceptedAt: data.privacyAccepted ? new Date() : null
+          privacyAcceptedAt: data.privacyAccepted ? new Date() : null,
+          termsAcceptedAt: data.termsAccepted ? new Date() : null,
+          termsSnapshot: data.termsAccepted ? termsText : null
         }
       });
 
       if (inviteToken) {
-        await consumeInviteTokenForReservation(inviteToken, reservation.id);
+        await consumeInviteTokenForReservation(inviteToken, reservation.id, tx);
       }
 
       await tx.signature.create({
@@ -192,6 +197,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
         } · ${reservationWithSignatures.numberOfGuests} Personen · ${
           reservationWithSignatures.paymentMethod
         }</p>
+        <p>Start Essen: ${reservationWithSignatures.startMeal ?? '-'}</p>
         <p>Extras: ${extrasListEmail}</p>
         <p>Bemerkungen / Unverträglichkeiten: ${
           reservationWithSignatures.extras ?? 'Keine Angaben'

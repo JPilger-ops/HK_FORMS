@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from './prisma';
+import type { Prisma } from '@prisma/client';
 import { addDays } from 'date-fns/addDays';
 import { isBefore } from 'date-fns/isBefore';
 
@@ -80,30 +81,43 @@ export async function validateInviteToken(token: string): Promise<InviteValidati
   };
 }
 
-export async function consumeInviteTokenForReservation(token: string, reservationId: string) {
+async function consumeInvite(
+  token: string,
+  reservationId: string,
+  client: Prisma.TransactionClient
+) {
   const hash = hashToken(token);
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
-    const invite = await tx.inviteLink.findUnique({ where: { tokenHash: hash } });
-    if (!invite) throw new Error('TOKEN_INVALID');
-    if (invite.isRevoked) throw new Error('TOKEN_REVOKED');
-    if (invite.expiresAt && isBefore(invite.expiresAt, now)) throw new Error('TOKEN_EXPIRED');
-    const updated = await tx.inviteLink.updateMany({
-      where: {
-        id: invite.id,
-        isRevoked: false,
-        useCount: { lt: invite.maxUses },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
-      },
-      data: {
-        useCount: { increment: 1 },
-        usedAt: invite.useCount + 1 >= invite.maxUses ? now : invite.usedAt,
-        usedByReservationId: reservationId
-      }
-    });
-    if (updated.count === 0) {
-      throw new Error('TOKEN_USED');
+  const invite = await client.inviteLink.findUnique({ where: { tokenHash: hash } });
+  if (!invite) throw new Error('TOKEN_INVALID');
+  if (invite.isRevoked) throw new Error('TOKEN_REVOKED');
+  if (invite.expiresAt && isBefore(invite.expiresAt, now)) throw new Error('TOKEN_EXPIRED');
+  const updated = await client.inviteLink.updateMany({
+    where: {
+      id: invite.id,
+      isRevoked: false,
+      useCount: { lt: invite.maxUses },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+    },
+    data: {
+      useCount: { increment: 1 },
+      usedAt: invite.useCount + 1 >= invite.maxUses ? now : invite.usedAt,
+      usedByReservationId: reservationId
     }
-    return invite;
   });
+  if (updated.count === 0) {
+    throw new Error('TOKEN_USED');
+  }
+  return invite;
+}
+
+export async function consumeInviteTokenForReservation(
+  token: string,
+  reservationId: string,
+  tx?: Prisma.TransactionClient
+) {
+  if (tx) {
+    return consumeInvite(token, reservationId, tx);
+  }
+  return prisma.$transaction((client) => consumeInvite(token, reservationId, client));
 }

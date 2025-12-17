@@ -105,7 +105,7 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
   );
   const isAdmin = data?.user?.role === 'ADMIN';
   const navButtonClasses =
-    'inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-white/90 via-white/85 to-white/70 px-4 py-2 text-sm font-medium text-brand shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)] ring-1 ring-white/70 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.45)] active:translate-y-0';
+    'inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)] ring-1 ring-brand/40 transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.45)] active:translate-y-0';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -137,7 +137,7 @@ export function AdminHeader({ autoLogoutMinutes }: Props) {
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: '/admin/login' })}
-            className={`${navButtonClasses} text-slate-800`}
+            className={`inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-[0_12px_32px_-16px_rgba(0,0,0,0.4)] ring-1 ring-red-500/50 transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.45)] active:translate-y-0`}
           >
             Logout {userLabel ? `(${userLabel})` : ''}
           </button>

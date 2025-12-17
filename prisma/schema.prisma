@@ -59,6 +59,7 @@ model ReservationRequest {
   eventType           String
   eventStartTime      String
   eventEndTime        String
+  startMeal           String?
   numberOfGuests      Int
   paymentMethod       String
   extrasSelection     String?           @db.Text
@@ -69,6 +70,8 @@ model ReservationRequest {
   internalResponsible String?
   internalNotes       String?
   privacyAcceptedAt   DateTime?
+  termsAcceptedAt     DateTime?
+  termsSnapshot       String?           @db.Text
   legacyData          Json?
   assignedToId        String?
   assignedTo          User?             @relation("ReservationAssigned", fields: [assignedToId], references: [id])
@@ -140,4 +143,11 @@ model AuditLog {
   userId        String?
   action        String
   createdAt     DateTime           @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

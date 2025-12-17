@@ -118,6 +118,10 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               </dd>
             </div>
             <div>
+              <dt className="text-slate-500">Start Essen</dt>
+              <dd>{reservation.startMeal ?? '-'}</dd>
+            </div>
+            <div>
               <dt className="text-slate-500">Personenzahl</dt>
               <dd>{reservation.numberOfGuests}</dd>
             </div>
@@ -191,6 +195,17 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
           <div className="mt-4 rounded border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="text-xs uppercase tracking-wide">Datenschutz</p>
             <p className="mt-1">{privacyText}</p>
+            <p className="mt-1">
+              {reservation.termsAcceptedAt
+                ? `Reservierungsbedingungen bestätigt am ${reservation.termsAcceptedAt.toLocaleString('de-DE')}`
+                : 'Keine Bestätigung der Reservierungsbedingungen hinterlegt.'}
+            </p>
+            {reservation.termsSnapshot && (
+              <div className="mt-2 rounded border border-amber-200 bg-white/60 p-2 text-xs text-slate-700">
+                <p className="font-semibold text-amber-900">Bestätigter Text</p>
+                <p className="whitespace-pre-line text-slate-700">{reservation.termsSnapshot}</p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

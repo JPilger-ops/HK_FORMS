@@ -24,20 +24,38 @@ export function middleware(request: NextRequest) {
 
   const host = request.headers.get('host');
   const { pathname } = request.nextUrl;
-  let target: URL | null = null;
+  const isAsset =
+    pathname.startsWith('/_next') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname.startsWith('/assets');
 
-  if (formUrl && pathname.startsWith('/request')) {
-    target = formUrl;
-  } else if (adminUrl && (pathname.startsWith('/admin') || pathname.startsWith('/api/auth'))) {
-    target = adminUrl;
+  const isFormHost = formUrl && host === formUrl.host;
+  const isAdminHost = adminUrl && host === adminUrl.host;
+
+  if (isFormHost) {
+    const allowed =
+      isAsset ||
+      pathname.startsWith('/request') ||
+      pathname.startsWith('/api/invites/validate') ||
+      pathname === '/not-found';
+    if (!allowed) {
+      const url = new URL('/not-found', request.url);
+      return NextResponse.rewrite(url, { status: 404 });
+    }
+    return NextResponse.next();
   }
 
-  if (target && host && host !== target.host) {
-    const redirectUrl = new URL(request.nextUrl.toString());
-    redirectUrl.protocol = target.protocol;
-    redirectUrl.hostname = target.hostname;
-    redirectUrl.port = target.port;
-    return NextResponse.redirect(redirectUrl, 308);
+  if (isAdminHost) {
+    // Auf Admin-Domain dürfen Admin-Routen; Anfrage-Routen werden (wie bisher) auf die Formular-Domain gelegt.
+    if (pathname.startsWith('/request') && formUrl) {
+      const redirectUrl = new URL(request.nextUrl.toString());
+      redirectUrl.protocol = formUrl.protocol;
+      redirectUrl.hostname = formUrl.hostname;
+      redirectUrl.port = formUrl.port;
+      return NextResponse.redirect(redirectUrl, 308);
+    }
+    return NextResponse.next();
   }
 
   return NextResponse.next();

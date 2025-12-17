@@ -3,6 +3,7 @@ import { validateInviteToken } from '@/lib/tokens';
 import { listActiveExtraOptions } from '@/server/extras';
 import { InvalidRequestNotice } from './invalid/invalid-request';
 import { FooterLinks } from '@/components/footer-links';
+import { getDepositSettings, getReservationTerms } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,8 @@ export default async function RequestPage({
   }
 
   const extrasOptions = await listActiveExtraOptions();
+  const termsText = await getReservationTerms();
+  const depositSettings = await getDepositSettings();
 
   return (
     <>
@@ -36,6 +39,8 @@ export default async function RequestPage({
               inviteToken={token}
               extrasOptions={extrasOptions}
               enforcedEndTime="22:30"
+              termsText={termsText}
+              depositSettings={depositSettings}
             />
           </div>
         </div>
