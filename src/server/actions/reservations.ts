@@ -5,10 +5,19 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { reservationToPdf } from '@/lib/pdf';
 import { sendReservationMail } from '@/lib/email';
-import { consumeInviteToken } from '@/lib/tokens';
-import { ReservationStatus, SignatureType } from '@prisma/client';
+import { consumeInviteTokenForReservation } from '@/lib/tokens';
+import { Prisma, ReservationStatus, SignatureType } from '@prisma/client';
 import { assertPermission } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/audit';
+import {
+  calculatePricing,
+  buildExtrasSnapshot,
+  ExtraOptionInput,
+  parseExtrasSnapshot
+} from '@/lib/pricing';
+import { getReservationTerms } from '@/lib/settings';
+
+const ENFORCED_END_TIME = '22:30';
 
 function parseSignature(dataUrl: string) {
   const base64 = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
@@ -22,73 +31,180 @@ function normalizeNumber(value: number | undefined | null) {
   return null;
 }
 
+function formatHostAddress(data: {
+  hostStreet?: string;
+  hostPostalCode?: string;
+  hostCity?: string;
+}) {
+  const parts = [
+    (data.hostStreet ?? '').trim(),
+    [data.hostPostalCode ?? '', data.hostCity ?? ''].filter(Boolean).join(' ').trim()
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
+async function getExtrasForSelection(ids: string[]): Promise<ExtraOptionInput[]> {
+  if (!ids.length) return [];
+  const extras = await prisma.extraOption.findMany({
+    where: { id: { in: ids }, isActive: true },
+    orderBy: { sortOrder: 'asc' }
+  });
+  return extras.map((extra) => ({
+    id: extra.id,
+    label: extra.label,
+    description: extra.description,
+    pricingType: extra.pricingType === 'PER_PERSON' ? 'PER_PERSON' : 'FLAT',
+    priceCents: extra.priceCents
+  }));
+}
+
 export async function createReservationAction(input: unknown, opts?: { inviteToken?: string }) {
   const safeParse = reservationSchema.safeParse(input);
   if (!safeParse.success) {
     return { success: false, error: 'VALIDATION_ERROR', details: safeParse.error.flatten() };
   }
   const data = safeParse.data;
-  const rateKey = `request:${data.guestEmail}`;
+  const rateKey = `request:${data.hostEmail}`;
   if (!checkRateLimit(rateKey)) {
     return { success: false, error: 'RATE_LIMITED' };
   }
 
-  if (opts?.inviteToken) {
-    const token = await consumeInviteToken(opts.inviteToken);
-    if (!token) {
-      return { success: false, error: 'TOKEN_INVALID' };
-    }
+  const inviteToken = opts?.inviteToken;
+  if (!inviteToken) {
+    return { success: false, error: 'TOKEN_REQUIRED' };
   }
 
-  const reservation = await prisma.reservationRequest.create({
-    data: {
-      guestName: data.guestName,
-      guestEmail: data.guestEmail,
-      guestPhone: data.guestPhone,
-      eventDate: new Date(data.eventDate),
-      eventType: data.eventType,
-      eventStartTime: data.eventStartTime,
-      eventEndTime: data.eventEndTime,
-      numberOfGuests: data.numberOfGuests,
-      paymentMethod: data.paymentMethod,
-      extras: data.extras,
-      priceEstimate: normalizeNumber(data.priceEstimate),
-      totalPrice: normalizeNumber(data.totalPrice),
-      internalResponsible: data.internalResponsible,
-      internalNotes: data.internalNotes
-    }
-  });
+  const selectedExtras = Array.from(
+    new Set((data.selectedExtras ?? []).filter((item) => typeof item === 'string'))
+  );
+  const extrasOptions = await getExtrasForSelection(selectedExtras);
+  const validExtras = selectedExtras.filter((id) => extrasOptions.some((extra) => extra.id === id));
+  const extrasSnapshot = buildExtrasSnapshot(validExtras, extrasOptions);
+  const pricing = calculatePricing(data.numberOfGuests, validExtras, extrasOptions);
+  const hostFullName = `${data.hostFirstName} ${data.hostLastName}`.trim();
+  const hostAddress = formatHostAddress(data);
+  const termsText = await getReservationTerms();
 
-  await prisma.signature.create({
-    data: {
-      reservationId: reservation.id,
-      type: SignatureType.HOST,
-      imageData: parseSignature(data.signature)
-    }
-  });
+  type ReservationWithSignatures = Prisma.ReservationRequestGetPayload<{
+    include: { signatures: true };
+  }>;
 
-  const reservationWithSignatures = await prisma.reservationRequest.findUnique({
-    where: { id: reservation.id },
-    include: { signatures: true }
-  });
+  let reservationWithSignatures: ReservationWithSignatures | null;
+  try {
+    reservationWithSignatures = await prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservationRequest.create({
+        data: {
+          hostFirstName: data.hostFirstName,
+          hostLastName: data.hostLastName,
+          hostStreet: data.hostStreet,
+          hostPostalCode: data.hostPostalCode,
+          hostCity: data.hostCity,
+          hostPhone: data.hostPhone,
+          hostEmail: data.hostEmail,
+          guestName: hostFullName,
+          guestEmail: data.hostEmail,
+          guestPhone: data.hostPhone,
+          guestAddress: hostAddress,
+          eventDate: new Date(data.eventDate),
+          eventType: data.eventType,
+          eventStartTime: data.eventStartTime,
+          eventEndTime: ENFORCED_END_TIME,
+          startMeal: data.startMeal,
+          numberOfGuests: data.numberOfGuests,
+          paymentMethod: data.paymentMethod,
+          extrasSelection: validExtras.length ? JSON.stringify(validExtras) : null,
+          extrasSnapshot: extrasSnapshot.length
+            ? (extrasSnapshot as Prisma.InputJsonValue)
+            : undefined,
+          extras: data.notes,
+          priceEstimate: normalizeNumber(pricing.base),
+          totalPrice: normalizeNumber(pricing.total),
+          privacyAcceptedAt: data.privacyAccepted ? new Date() : null,
+          termsAcceptedAt: data.termsAccepted ? new Date() : null,
+          termsSnapshot: data.termsAccepted ? termsText : null
+        }
+      });
+
+      if (inviteToken) {
+        await consumeInviteTokenForReservation(inviteToken, reservation.id, tx);
+      }
+
+      await tx.signature.create({
+        data: {
+          reservationId: reservation.id,
+          type: SignatureType.HOST,
+          imageData: parseSignature(data.signature)
+        }
+      });
+
+      return tx.reservationRequest.findUnique({
+        where: { id: reservation.id },
+        include: { signatures: true }
+      });
+    });
+  } catch (error: any) {
+    const map: Record<string, string> = {
+      TOKEN_INVALID: 'TOKEN_INVALID',
+      TOKEN_REVOKED: 'TOKEN_INVALID',
+      TOKEN_EXPIRED: 'TOKEN_INVALID',
+      TOKEN_USED: 'TOKEN_INVALID'
+    };
+    const code = map[error?.message];
+    if (code) {
+      return { success: false, error: code };
+    }
+    throw error;
+  }
 
   if (!reservationWithSignatures) {
-    return { success: false, error: 'NOT_FOUND' };
+    throw new Error('RESERVATION_CREATION_FAILED');
   }
 
   const pdf = await reservationToPdf(reservationWithSignatures);
+  const eventDateLabel = new Intl.DateTimeFormat('de-DE').format(
+    reservationWithSignatures.eventDate
+  );
+  const extrasForEmail = parseExtrasSnapshot(reservationWithSignatures.extrasSnapshot);
+  const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const extrasListEmail =
+    extrasForEmail.length > 0
+      ? `<ul>${extrasForEmail
+          .map((extra) => {
+            const price = euro.format(extra.priceCents / 100);
+            const typeLabel = extra.pricingType === 'PER_PERSON' ? 'pro Person' : 'pauschal';
+            return `<li>${extra.label} (${typeLabel}) – ${price}</li>`;
+          })
+          .join('')}</ul>`
+      : '<em>Keine</em>';
 
-  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map((x) => x.trim()).filter(Boolean);
+  const adminEmailTargets = process.env.ADMIN_NOTIFICATION_EMAILS || process.env.SMTP_FROM || '';
+  const adminEmails = adminEmailTargets
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
 
   if (adminEmails?.length) {
     await sendReservationMail({
-      reservationId: reservation.id,
+      reservationId: reservationWithSignatures.id,
       to: adminEmails,
-      subject: `Neue Reservierungsanfrage ${reservation.guestName}`,
-      html: `<p>Neue Anfrage von ${reservation.guestName} (${reservation.guestEmail}).</p>`,
+      subject: `Neue Reservierungsanfrage ${reservationWithSignatures.guestName}`,
+      html: `<p><strong>Neue Anfrage</strong> von ${reservationWithSignatures.guestName} (${reservationWithSignatures.guestEmail})</p>
+        <p>Kontakt: ${reservationWithSignatures.guestPhone ?? '-'} · ${
+          reservationWithSignatures.guestAddress ?? '-'
+        }</p>
+        <p>Veranstaltung: ${eventDateLabel}, ${reservationWithSignatures.eventStartTime} - ${
+          reservationWithSignatures.eventEndTime
+        } · ${reservationWithSignatures.numberOfGuests} Personen · ${
+          reservationWithSignatures.paymentMethod
+        }</p>
+        <p>Start Essen: ${reservationWithSignatures.startMeal ?? '-'}</p>
+        <p>Extras: ${extrasListEmail}</p>
+        <p>Bemerkungen / Unverträglichkeiten: ${
+          reservationWithSignatures.extras ?? 'Keine Angaben'
+        }</p>`,
       attachments: [
         {
-          filename: `heidekoenig_reservierung_${reservation.id}.pdf`,
+          filename: `heidekoenig_reservierung_${reservationWithSignatures.id}.pdf`,
           content: pdf
         }
       ]
@@ -97,14 +213,14 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
 
   if (process.env.SEND_GUEST_CONFIRMATION === 'true') {
     await sendReservationMail({
-      reservationId: reservation.id,
-      to: reservation.guestEmail,
+      reservationId: reservationWithSignatures.id,
+      to: reservationWithSignatures.guestEmail,
       subject: 'Ihre Anfrage wurde übermittelt',
-      html: '<p>Vielen Dank für Ihre Anfrage. Wir melden uns zeitnah.</p>'
+      html: `<p>Vielen Dank für Ihre Anfrage vom ${eventDateLabel}.</p><p>Wir melden uns zeitnah mit einem Angebot. Geplante Zeit: ${reservationWithSignatures.eventStartTime} - ${reservationWithSignatures.eventEndTime}.</p>`
     });
   }
 
-  return { success: true, reservationId: reservation.id };
+  return { success: true, reservationId: reservationWithSignatures.id };
 }
 
 export async function updateReservationStatusAction(

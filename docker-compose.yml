@@ -1,4 +1,4 @@
-version: '3.9'
+
 services:
   db:
     image: postgres:15-alpine
@@ -10,10 +10,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - hkforms
+      - hkforms    
+    ports:
+      - "5432:5432"
+  
 
   app:
-    build: .
+    image: hkforms:latest
     restart: unless-stopped
     depends_on:
       - db
@@ -29,6 +32,9 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       ADMIN_NOTIFICATION_EMAILS: ${ADMIN_NOTIFICATION_EMAILS}
       APP_URL: ${APP_URL:-http://192.168.60.100:3000}
+      ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://192.168.60.100:3000}
+      PUBLIC_FORM_URL: ${PUBLIC_FORM_URL:-http://192.168.60.100:3000}
+      ENFORCE_DOMAIN_ROUTING: ${ENFORCE_DOMAIN_ROUTING:-true}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-10}
       SEND_GUEST_CONFIRMATION: ${SEND_GUEST_CONFIRMATION:-false}

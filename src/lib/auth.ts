@@ -7,8 +7,11 @@ import { Role } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { cookies, headers } from 'next/headers';
 import { checkRateLimit } from './rate-limit';
+import { getAutoLogoutMinutes } from './config';
 
-export const authOptions: NextAuthOptions = {
+const SESSION_MAX_AGE_SECONDS = Math.max(5, getAutoLogoutMinutes()) * 60;
+
+export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -51,12 +54,17 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: SESSION_MAX_AGE_SECONDS
+  },
+  jwt: {
+    maxAge: SESSION_MAX_AGE_SECONDS
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/admin/login'
   },
+  // trust proxy headers (required behind Nginx/Proxy Manager)
   trustHost: true,
   callbacks: {
     async jwt({ token, user }) {
@@ -74,7 +82,10 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-next-auth.session-token'
+          : 'next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -105,20 +116,52 @@ export async function getSessionUser() {
   return session?.user;
 }
 
-export function getBaseUrl() {
+function normalizeUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return null;
+  }
+}
+
+function headerBaseUrl() {
   const h = headers();
   const proto = h.get('x-forwarded-proto');
   const forwardedHost = h.get('x-forwarded-host');
   const host = h.get('host');
-  const headerUrl = proto && (forwardedHost || host) ? `${proto}://${forwardedHost || host}` : null;
+  return proto && (forwardedHost || host) ? `${proto}://${forwardedHost || host}` : null;
+}
+
+const localFallback = `http://localhost:${process.env.PORT ?? 3000}`;
+
+export function getAdminBaseUrl() {
   const cookie = cookies().get('APP_URL')?.value;
   return (
-    headerUrl ||
-    cookie ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    `http://localhost:${process.env.PORT ?? 3000}`
+    headerBaseUrl() ||
+    normalizeUrl(cookie) ||
+    normalizeUrl(process.env.ADMIN_BASE_URL) ||
+    normalizeUrl(process.env.APP_URL) ||
+    normalizeUrl(process.env.NEXTAUTH_URL) ||
+    localFallback
   ).replace(/\/$/, '');
+}
+
+export function getPublicFormBaseUrl() {
+  return (
+    normalizeUrl(process.env.PUBLIC_FORM_URL) ||
+    normalizeUrl(process.env.FORM_BASE_URL) ||
+    normalizeUrl(process.env.NEXT_PUBLIC_FORM_URL) ||
+    normalizeUrl(process.env.APP_URL) ||
+    normalizeUrl(process.env.NEXTAUTH_URL) ||
+    normalizeUrl(headerBaseUrl()) ||
+    localFallback
+  ).replace(/\/$/, '');
+}
+
+export function getBaseUrl() {
+  return getAdminBaseUrl();
 }
 
 export const getTrustedProxyHeaders = getBaseUrl;

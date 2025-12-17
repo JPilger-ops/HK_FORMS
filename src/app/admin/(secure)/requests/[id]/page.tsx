@@ -5,6 +5,21 @@ import { RequestDetailActions } from '@/components/admin/request-detail-actions'
 import { Buffer } from 'node:buffer';
 import { getBaseUrl } from '@/lib/auth';
 import { assertPermission } from '@/lib/rbac';
+import { calculatePricing, parseExtrasSnapshot } from '@/lib/pricing';
+import { mapExtraToInput } from '@/server/extras';
+
+function parseSelectedExtraIds(value?: string | null) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
 
 export default async function RequestDetailPage({ params }: { params: { id: string } }) {
   await assertPermission('view:requests');
@@ -18,9 +33,45 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
   const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const base = getBaseUrl();
-  const defaultInviteHours = Number(process.env.INVITE_LINK_HOURS ?? 48) || 48;
-
-  const formatMoney = (value?: any) => (value ? `${value.toString()} €` : '-');
+  const legacy = (reservation.legacyData ?? {}) as Record<string, any>;
+  const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const formatMoney = (value?: any) =>
+    value || value === 0 ? euro.format(Number(value ?? 0)) : '-';
+  const extrasSnapshot = parseExtrasSnapshot(reservation.extrasSnapshot);
+  const selectedFromLegacy = parseSelectedExtraIds(reservation.extrasSelection);
+  const selectedExtras = extrasSnapshot.length
+    ? extrasSnapshot.map((extra) => extra.id)
+    : selectedFromLegacy;
+  const extrasFromDb =
+    selectedExtras.length && extrasSnapshot.length === 0
+      ? await prisma.extraOption.findMany({ where: { id: { in: selectedExtras } } })
+      : [];
+  const extrasForPricing =
+    extrasSnapshot.length > 0 ? extrasSnapshot : extrasFromDb.map(mapExtraToInput);
+  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtras, extrasForPricing);
+  const basePrice = reservation.priceEstimate ? Number(reservation.priceEstimate) : pricing.base;
+  const totalPrice = reservation.totalPrice ? Number(reservation.totalPrice) : pricing.total;
+  const extrasTotal = pricing.extrasTotal || Math.max(0, totalPrice - basePrice);
+  const privacyText = reservation.privacyAcceptedAt
+    ? `Einwilligung am ${reservation.privacyAcceptedAt.toLocaleString('de-DE')}`
+    : 'Keine Angabe hinterlegt';
+  const hostFullName =
+    `${reservation.hostFirstName ?? ''} ${reservation.hostLastName ?? ''}`.trim() ||
+    reservation.guestName ||
+    (legacy.guestName as string) ||
+    '';
+  const hostEmail =
+    reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
+  const hostPhone =
+    reservation.hostPhone ?? reservation.guestPhone ?? (legacy.guestPhone as string) ?? '-';
+  const hostAddressParts = [
+    (reservation.hostStreet ?? '').trim(),
+    [reservation.hostPostalCode ?? '', reservation.hostCity ?? ''].filter(Boolean).join(' ').trim()
+  ].filter(Boolean);
+  const hostAddress =
+    hostAddressParts.length > 0
+      ? hostAddressParts.join(', ')
+      : (reservation.guestAddress ?? (legacy.guestAddress as string) ?? '-');
 
   return (
     <AdminShell>
@@ -38,18 +89,26 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-slate-500">Gastgeber</dt>
-              <dd className="font-medium">{reservation.guestName}</dd>
+              <dd className="font-medium">{hostFullName}</dd>
             </div>
             <div>
               <dt className="text-slate-500">E-Mail</dt>
-              <dd>{reservation.guestEmail}</dd>
+              <dd>{hostEmail}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Telefon</dt>
+              <dd>{hostPhone}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-slate-500">Adresse</dt>
+              <dd>{hostAddress}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Anlass</dt>
               <dd>{reservation.eventType}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Datum</dt>
+              <dt className="text-slate-500">Veranstaltungsdatum</dt>
               <dd>{new Intl.DateTimeFormat('de-DE').format(reservation.eventDate)}</dd>
             </div>
             <div>
@@ -59,28 +118,94 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               </dd>
             </div>
             <div>
+              <dt className="text-slate-500">Start Essen</dt>
+              <dd>{reservation.startMeal ?? '-'}</dd>
+            </div>
+            <div>
               <dt className="text-slate-500">Personenzahl</dt>
               <dd>{reservation.numberOfGuests}</dd>
             </div>
+            <div>
+              <dt className="text-slate-500">Zahlungsart</dt>
+              <dd>{reservation.paymentMethod}</dd>
+            </div>
           </dl>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Preis</p>
-              <p className="font-medium">{formatMoney(reservation.priceEstimate)}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Grundpreis</p>
+              <p className="font-medium">{formatMoney(basePrice)}</p>
+              <p className="text-xs text-slate-500">
+                {formatMoney(pricing.pricePerGuest)} pro Person
+              </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Total</p>
-              <p className="font-medium">{formatMoney(reservation.totalPrice)}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Extras</p>
+              <p className="font-medium">{formatMoney(extrasTotal)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Zuständig</p>
-              <p>{reservation.internalResponsible ?? '-'}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Gesamt</p>
+              <p className="font-medium">{formatMoney(totalPrice)}</p>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Bemerkungen</p>
-              <p>{reservation.internalNotes ?? '-'}</p>
+          </div>
+
+          <div className="mt-4 rounded border border-slate-200 p-3">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Extras (Auswahl)</p>
+            {pricing.extrasBreakdown.length > 0 ? (
+              <ul className="mt-2 list-disc pl-5 text-sm">
+                {pricing.extrasBreakdown.map((extra) => (
+                  <li key={extra.id} className="flex justify-between">
+                    <span>
+                      {extra.label}
+                      {extra.pricingType === 'PER_PERSON' ? ` (${extra.units} Pers.)` : ''}
+                    </span>
+                    <span>{formatMoney(extra.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">Keine Extras gewählt</p>
+            )}
+            {pricing.extrasBreakdown.length === 0 && extrasTotal > 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                Extras wurden übernommen, Details liegen nur als Summe vor.
+              </p>
+            )}
+            {reservation.extras && (
+              <p className="mt-3 text-sm text-slate-600">
+                Bemerkungen / Unverträglichkeiten: {reservation.extras}
+              </p>
+            )}
+          </div>
+
+          {(reservation.internalResponsible || reservation.internalNotes) && (
+            <div className="rounded border border-slate-200 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Interne Felder</p>
+              {reservation.internalResponsible && (
+                <p className="text-sm text-slate-600">
+                  Zuständig: {reservation.internalResponsible}
+                </p>
+              )}
+              {reservation.internalNotes && (
+                <p className="text-sm text-slate-600">Notizen: {reservation.internalNotes}</p>
+              )}
             </div>
+          )}
+
+          <div className="mt-4 rounded border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="text-xs uppercase tracking-wide">Datenschutz</p>
+            <p className="mt-1">{privacyText}</p>
+            <p className="mt-1">
+              {reservation.termsAcceptedAt
+                ? `Reservierungsbedingungen bestätigt am ${reservation.termsAcceptedAt.toLocaleString('de-DE')}`
+                : 'Keine Bestätigung der Reservierungsbedingungen hinterlegt.'}
+            </p>
+            {reservation.termsSnapshot && (
+              <div className="mt-2 rounded border border-amber-200 bg-white/60 p-2 text-xs text-slate-700">
+                <p className="font-semibold text-amber-900">Bestätigter Text</p>
+                <p className="whitespace-pre-line text-slate-700">{reservation.termsSnapshot}</p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -132,7 +257,6 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             reservationId={reservation.id}
             currentStatus={reservation.status}
             appUrl={base}
-            defaultInviteHours={defaultInviteHours}
           />
 
           <div className="mt-6">
@@ -144,7 +268,9 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
                   <p className="text-xs text-slate-500">{log.createdAt.toLocaleString()}</p>
                 </li>
               ))}
-              {reservation.auditLogs.length === 0 && <p className="text-slate-500">Keine Einträge</p>}
+              {reservation.auditLogs.length === 0 && (
+                <p className="text-slate-500">Keine Einträge</p>
+              )}
             </ul>
           </div>
         </div>

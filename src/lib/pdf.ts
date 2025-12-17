@@ -1,14 +1,71 @@
 import { chromium } from 'playwright';
 import { ReservationRequest, Signature } from '@prisma/client';
+import { ExtraOptionInput, calculatePricing, parseExtrasSnapshot } from './pricing';
+import { prisma } from './prisma';
+import { mapExtraToInput } from '@/server/extras';
 
-function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }) {
+function parseSelectedExtraIds(value?: string | null) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+function buildHtml(
+  reservation: ReservationRequest & { signatures: Signature[] },
+  extrasOptions: ExtraOptionInput[],
+  selectedExtraIds: string[]
+) {
+  const legacy = (reservation as any).legacyData ?? {};
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
   const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const signatureImg = (sig?: Signature) =>
-    sig ? `<img src="data:image/png;base64,${Buffer.from(sig.imageData).toString('base64')}" style="width:200px">` : '<em>keine</em>';
+    sig
+      ? `<img src="data:image/png;base64,${Buffer.from(sig.imageData).toString('base64')}" style="width:200px">`
+      : '<em>keine</em>';
 
   const formatter = new Intl.DateTimeFormat('de-DE', { dateStyle: 'full' });
-  const price = (value?: any) => (value ? `${value} €` : '-');
+  const priceFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const price = (value?: any) =>
+    value || value === 0 ? priceFormatter.format(Number(value ?? 0)) : '-';
+
+  const hostName =
+    `${reservation.hostFirstName ?? ''} ${reservation.hostLastName ?? ''}`.trim() ||
+    reservation.guestName ||
+    (legacy.guestName as string) ||
+    '';
+  const hostEmail =
+    reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
+  const hostPhone =
+    reservation.hostPhone ?? reservation.guestPhone ?? (legacy.guestPhone as string) ?? '-';
+  const hostStreet =
+    reservation.hostStreet ?? reservation.guestAddress ?? (legacy.guestAddress as string) ?? '-';
+  const hostPostalAndCity =
+    [reservation.hostPostalCode ?? '', reservation.hostCity ?? ''].filter(Boolean).join(' ') ||
+    (legacy.guestAddress as string) ||
+    '-';
+
+  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtraIds, extrasOptions);
+  const basePrice = reservation.priceEstimate ? Number(reservation.priceEstimate) : pricing.base;
+  const totalPrice = reservation.totalPrice ? Number(reservation.totalPrice) : pricing.total;
+  const extrasTotal = pricing.extrasTotal || Math.max(0, totalPrice - basePrice);
+  const extrasList =
+    pricing.extrasBreakdown.length > 0
+      ? `<ul style="margin:4px 0 0 16px;padding:0;">${pricing.extrasBreakdown
+          .map(
+            (extra) =>
+              `<li>${extra.label}${
+                extra.pricingType === 'PER_PERSON' ? ` (${extra.units} Pers.)` : ''
+              }: ${price(extra.total)}</li>`
+          )
+          .join('')}</ul>`
+      : '<em>Keine</em>';
 
   return `<!DOCTYPE html>
   <html>
@@ -30,11 +87,13 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
     </header>
 
     <div class="section">
-      <h2>Kontakt</h2>
+      <h2>Gastgeber</h2>
       <table>
-        <tr><th>Gastgeber</th><td>${reservation.guestName}</td></tr>
-        <tr><th>E-Mail</th><td>${reservation.guestEmail}</td></tr>
-        <tr><th>Telefon</th><td>${reservation.guestPhone ?? '-'}</td></tr>
+        <tr><th>Name</th><td>${hostName}</td></tr>
+        <tr><th>Straße + Nr.</th><td>${hostStreet}</td></tr>
+        <tr><th>PLZ / Ort</th><td>${hostPostalAndCity}</td></tr>
+        <tr><th>Telefon</th><td>${hostPhone}</td></tr>
+        <tr><th>E-Mail</th><td>${hostEmail}</td></tr>
       </table>
     </div>
 
@@ -42,8 +101,9 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
       <h2>Anlass</h2>
       <table>
         <tr><th>Anlass</th><td>${reservation.eventType}</td></tr>
-        <tr><th>Datum</th><td>${formatter.format(reservation.eventDate)}</td></tr>
-        <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime}</td></tr>
+        <tr><th>Veranstaltungsdatum</th><td>${formatter.format(reservation.eventDate)}</td></tr>
+        <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime ?? '22:30'}</td></tr>
+        <tr><th>Start Essen</th><td>${reservation.startMeal ?? '-'}</td></tr>
         <tr><th>Personenzahl</th><td>${reservation.numberOfGuests}</td></tr>
       </table>
     </div>
@@ -51,19 +111,13 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
     <div class="section">
       <h2>Leistungen & Preise</h2>
       <table>
-        <tr><th>Extras</th><td>${reservation.extras ?? '-'}</td></tr>
         <tr><th>Zahlungsart</th><td>${reservation.paymentMethod}</td></tr>
-        <tr><th>Preis Schätzung</th><td>${price(reservation.priceEstimate)}</td></tr>
-        <tr><th>Total</th><td>${price(reservation.totalPrice)}</td></tr>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>Interne Informationen</h2>
-      <table>
-        <tr><th>Zuständig</th><td>${reservation.internalResponsible ?? '-'}</td></tr>
-        <tr><th>Status</th><td>${reservation.status}</td></tr>
-        <tr><th>Notizen</th><td>${reservation.internalNotes ?? '-'}</td></tr>
+        <tr><th>Extras (Auswahl)</th><td>${extrasList}</td></tr>
+        <tr><th>Preis pro Person</th><td>${price(pricing.pricePerGuest)}</td></tr>
+        <tr><th>Grundpreis</th><td>${price(basePrice)}</td></tr>
+        <tr><th>Extras Summe</th><td>${price(extrasTotal)}</td></tr>
+        <tr><th>Total</th><td>${price(totalPrice)}</td></tr>
+        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${reservation.extras ?? '-'}</td></tr>
       </table>
     </div>
 
@@ -75,6 +129,31 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
       </table>
     </div>
 
+    <div class="section">
+      <h2>Datenschutz</h2>
+      <p>
+        ${
+          reservation.privacyAcceptedAt
+            ? `Einwilligung erteilt am ${reservation.privacyAcceptedAt.toLocaleString('de-DE')}`
+            : 'Keine Einwilligung hinterlegt (Bestandseintrag oder manuelle Erfassung).'
+        }
+      </p>
+      <p>
+        ${
+          reservation.termsAcceptedAt
+            ? `Reservierungsbedingungen bestätigt am ${reservation.termsAcceptedAt.toLocaleString(
+                'de-DE'
+              )}`
+            : 'Keine Bestätigung der Reservierungsbedingungen hinterlegt.'
+        }
+      </p>
+      ${
+        reservation.termsSnapshot
+          ? `<div style="margin-top:8px;padding:8px;border:1px solid #e5e7eb;background:#f9fafb;"><strong>Bestätigte Bedingungen:</strong><div style="white-space:pre-line;margin-top:4px;">${reservation.termsSnapshot}</div></div>`
+          : ''
+      }
+    </div>
+
     <footer>
       <p>Bankverbindung: Waldwirtschaft Heidekönig · IBAN DE00 0000 0000 0000 0000 00 · BIC ABCDDEFFXXX</p>
     </footer>
@@ -82,10 +161,27 @@ function buildHtml(reservation: ReservationRequest & { signatures: Signature[] }
   </html>`;
 }
 
-export async function reservationToPdf(reservation: ReservationRequest & { signatures: Signature[] }) {
+export async function reservationToPdf(
+  reservation: ReservationRequest & { signatures: Signature[] }
+) {
+  const extrasSnapshot = parseExtrasSnapshot(reservation.extrasSnapshot);
+  const selectedExtraIds = extrasSnapshot.length
+    ? extrasSnapshot.map((extra) => extra.id)
+    : parseSelectedExtraIds(reservation.extrasSelection);
+
+  let extrasOptions: ExtraOptionInput[] = extrasSnapshot;
+  if (!extrasOptions.length && selectedExtraIds.length) {
+    const extrasFromDb = await prisma.extraOption.findMany({
+      where: { id: { in: selectedExtraIds } }
+    });
+    extrasOptions = extrasFromDb.map(mapExtraToInput);
+  }
+
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  await page.setContent(buildHtml(reservation), { waitUntil: 'networkidle' });
+  await page.setContent(buildHtml(reservation, extrasOptions, selectedExtraIds), {
+    waitUntil: 'networkidle'
+  });
   const buffer = await page.pdf({
     format: 'A4',
     margin: { top: '24mm', left: '16mm', right: '16mm', bottom: '16mm' },

@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverActions: true
-  },
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
@@ -25,4 +22,4 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+module.exports = nextConfig;
