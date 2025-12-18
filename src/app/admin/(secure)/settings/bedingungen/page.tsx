@@ -2,6 +2,7 @@ import { AdminShell } from '@/components/admin/shell';
 import { assertPermission } from '@/lib/rbac';
 import { getReservationTerms } from '@/lib/settings';
 import { updateReservationTermsAction } from '@/server/actions/settings';
+import { primaryButtonClasses } from '@/app/admin/(secure)/settings/styles';
 
 export default async function BedingungenSettingsPage() {
   await assertPermission('manage:settings');
@@ -31,7 +32,7 @@ export default async function BedingungenSettingsPage() {
               className="mt-1 w-full rounded border px-3 py-2"
             />
           </div>
-          <button className="rounded bg-brand px-4 py-2 font-semibold text-white">Speichern</button>
+          <button className={`${primaryButtonClasses} px-5`}>Speichern</button>
         </form>
       </div>
     </AdminShell>

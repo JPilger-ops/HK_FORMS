@@ -1,21 +1,34 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 import { getPublicFormBaseUrl } from './auth';
+import { getSmtpSettings } from './settings';
 
-export async function getTransporter() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) {
+type TransporterWithFrom = {
+  transporter: nodemailer.Transporter;
+  from: string;
+};
+
+export async function getTransporter(): Promise<TransporterWithFrom> {
+  const settings = await getSmtpSettings();
+  const host = settings.host;
+  const port = settings.port ?? 587;
+  const user = settings.user;
+  const pass = settings.pass;
+  const from = settings.from ?? user ?? '';
+  const secure = settings.secure ?? port === 465;
+
+  if (!host || !user || !pass || !from) {
     throw new Error('SMTP configuration missing');
   }
-  return nodemailer.createTransport({
+
+  const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure,
     auth: { user, pass }
   });
+
+  return { transporter, from };
 }
 
 export async function sendReservationMail({
@@ -31,10 +44,10 @@ export async function sendReservationMail({
   html: string;
   attachments?: { filename: string; content: Buffer }[];
 }) {
-  const transporter = await getTransporter();
+  const { transporter, from } = await getTransporter();
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM,
+      from,
       to,
       subject,
       html,
@@ -75,13 +88,13 @@ export async function sendInviteEmail({
   formKey?: string;
   appUrl?: string;
 }) {
-  const transporter = await getTransporter();
+  const { transporter, from } = await getTransporter();
   const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
   const link = `${base}/request?token=${encodeURIComponent(token)}&form=${encodeURIComponent(formKey)}`;
   const html = `<p>Bitte füllen Sie Ihre Reservierungsanfrage aus.</p><p><a href="${link}" style="padding:10px 14px;background:#39523a;color:white;border-radius:6px;text-decoration:none;">Formular öffnen</a></p><p>Alternativ: ${link}</p>`;
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM,
+      from,
       to,
       subject: 'Heidekönig – Reservierungsanfrage',
       html

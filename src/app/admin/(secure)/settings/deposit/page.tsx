@@ -2,6 +2,7 @@ import { AdminShell } from '@/components/admin/shell';
 import { assertPermission } from '@/lib/rbac';
 import { getDepositSettings } from '@/lib/settings';
 import { updateDepositSettingsAction } from '@/server/actions/settings';
+import { primaryButtonClasses } from '@/app/admin/(secure)/settings/styles';
 
 export default async function DepositSettingsPage() {
   await assertPermission('manage:settings');
@@ -42,7 +43,7 @@ export default async function DepositSettingsPage() {
               className="mt-1 w-40 rounded border px-3 py-2"
             />
           </div>
-          <button className="rounded bg-brand px-4 py-2 font-semibold text-white">Speichern</button>
+          <button className={`${primaryButtonClasses} px-5`}>Speichern</button>
         </form>
       </div>
     </AdminShell>

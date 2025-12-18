@@ -1,21 +1,22 @@
 import type { Metadata } from 'next';
+import { LegalPage } from '@/components/legal-page';
+import { getLegalContent } from '@/lib/settings';
 
 export const metadata: Metadata = {
   title: 'Datenschutz',
   description: 'Datenschutzerklärung Waldwirtschaft Heidekönig'
 };
 
-export default function DatenschutzPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function DatenschutzPage() {
+  const content = await getLegalContent('datenschutz');
+
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-3xl font-semibold text-brand">Datenschutz</h1>
-      <div className="mt-4 space-y-3 text-slate-700">
-        <p>HIER TEXT EINTRAGEN</p>
-        <p>
-          Bitte den finalen Rechtstext von der Rechtsabteilung ergänzen. Die Seite dient als
-          Platzhalter für Informationspflichten nach DSGVO.
-        </p>
-      </div>
-    </main>
+    <LegalPage
+      title="Datenschutz"
+      intro="Informationen zur Verarbeitung personenbezogener Daten für Gäste und Mitarbeitende."
+      content={content}
+    />
   );
 }

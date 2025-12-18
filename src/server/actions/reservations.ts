@@ -15,7 +15,8 @@ import {
   ExtraOptionInput,
   parseExtrasSnapshot
 } from '@/lib/pricing';
-import { getReservationTerms } from '@/lib/settings';
+import { getEmailTemplateSettings, getReservationTerms } from '@/lib/settings';
+import { revalidatePath } from 'next/cache';
 
 const ENFORCED_END_TIME = '22:30';
 
@@ -41,6 +42,17 @@ function formatHostAddress(data: {
     [data.hostPostalCode ?? '', data.hostCity ?? ''].filter(Boolean).join(' ').trim()
   ].filter(Boolean);
   return parts.join(', ');
+}
+
+function renderTemplate(template: string, variables: Record<string, string>) {
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => variables[key] ?? '');
+}
+
+function toHtmlParagraphs(text: string) {
+  return text
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.trim().replace(/\n/g, '<br />')}</p>`)
+    .join('');
 }
 
 async function getExtrasForSelection(ids: string[]): Promise<ExtraOptionInput[]> {
@@ -212,11 +224,22 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   }
 
   if (process.env.SEND_GUEST_CONFIRMATION === 'true') {
+    const template = await getEmailTemplateSettings();
+    const vars = {
+      guestName: reservationWithSignatures.guestName,
+      eventDate: eventDateLabel,
+      eventStart: reservationWithSignatures.eventStartTime,
+      eventEnd: reservationWithSignatures.eventEndTime,
+      reservationId: reservationWithSignatures.id
+    };
+    const subject = renderTemplate(template.subject, vars);
+    const bodyHtml = toHtmlParagraphs(renderTemplate(template.body, vars));
+
     await sendReservationMail({
       reservationId: reservationWithSignatures.id,
       to: reservationWithSignatures.guestEmail,
-      subject: 'Ihre Anfrage wurde übermittelt',
-      html: `<p>Vielen Dank für Ihre Anfrage vom ${eventDateLabel}.</p><p>Wir melden uns zeitnah mit einem Angebot. Geplante Zeit: ${reservationWithSignatures.eventStartTime} - ${reservationWithSignatures.eventEndTime}.</p>`
+      subject,
+      html: bodyHtml
     });
   }
 
@@ -287,4 +310,24 @@ export async function sendReservationEmailAction(reservationId: string, recipien
   });
   await writeAuditLog({ reservationId, userId: session.user?.id, action: 'EMAIL:SENT' });
   return true;
+}
+
+export async function deleteReservationRequestsAction(ids: string[]) {
+  await assertPermission('edit:requests');
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (uniqueIds.length === 0) return { deleted: 0 };
+
+  await prisma.$transaction([
+    prisma.signature.deleteMany({ where: { reservationId: { in: uniqueIds } } }),
+    prisma.emailLog.deleteMany({ where: { reservationId: { in: uniqueIds } } }),
+    prisma.auditLog.deleteMany({ where: { reservationId: { in: uniqueIds } } }),
+    prisma.inviteLink.updateMany({
+      where: { usedByReservationId: { in: uniqueIds } },
+      data: { usedByReservationId: null, usedAt: null }
+    }),
+    prisma.reservationRequest.deleteMany({ where: { id: { in: uniqueIds } } })
+  ]);
+
+  revalidatePath('/admin/requests');
+  return { deleted: uniqueIds.length };
 }
