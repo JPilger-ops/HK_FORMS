@@ -9,6 +9,11 @@ import {
 } from '@/server/actions/extras';
 import { ExtraPricingType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import {
+  dangerButtonClasses,
+  iconButtonClasses,
+  primaryButtonClasses
+} from '@/components/admin/settings/button-styles';
 
 export default async function FormularSettingsPage() {
   await assertPermission('manage:settings');
@@ -97,20 +102,14 @@ export default async function FormularSettingsPage() {
                     <form action={moveExtra}>
                       <input type="hidden" name="id" value={extra.id} />
                       <input type="hidden" name="direction" value="up" />
-                      <button
-                        className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                        type="submit"
-                      >
+                      <button className={`${iconButtonClasses} text-sm`} type="submit">
                         ↑
                       </button>
                     </form>
                     <form action={moveExtra}>
                       <input type="hidden" name="id" value={extra.id} />
                       <input type="hidden" name="direction" value="down" />
-                      <button
-                        className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                        type="submit"
-                      >
+                      <button className={`${iconButtonClasses} text-sm`} type="submit">
                         ↓
                       </button>
                     </form>
@@ -177,17 +176,14 @@ export default async function FormularSettingsPage() {
                       />
                       Aktiv im Formular anzeigen
                     </label>
-                    <button className="rounded bg-brand px-3 py-2 text-xs text-white">
+                    <button className={`${primaryButtonClasses} text-xs px-3 py-2`}>
                       Speichern
                     </button>
                   </form>
                 </details>
                 <form action={deleteExtra} className="mt-2">
                   <input type="hidden" name="id" value={extra.id} />
-                  <button
-                    type="submit"
-                    className="rounded border border-red-200 px-3 py-2 text-xs text-red-700"
-                  >
+                  <button type="submit" className={`${dangerButtonClasses} text-xs px-3 py-2`}>
                     Löschen
                   </button>
                 </form>
@@ -251,7 +247,7 @@ export default async function FormularSettingsPage() {
               />
               Aktiv im Formular anzeigen
             </label>
-            <button className="w-full rounded bg-brand px-4 py-2 font-semibold text-white">
+            <button className={`${primaryButtonClasses} w-full justify-center`}>
               Extra speichern
             </button>
           </form>

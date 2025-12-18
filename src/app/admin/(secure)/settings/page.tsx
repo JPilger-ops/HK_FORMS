@@ -23,6 +23,11 @@ export default async function SettingsPage() {
           </Link>
         </li>
         <li>
+          <Link href="/admin/settings/rechtliches" className="text-brand underline">
+            Rechtliches & DSGVO
+          </Link>
+        </li>
+        <li>
           <Link href="/admin/settings/deposit" className="text-brand underline">
             Anzahlung
           </Link>
