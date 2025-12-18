@@ -30,6 +30,11 @@ const cards = [
     description: 'E-Mail-Benachrichtigungen für neue Reservierungen konfigurieren.'
   },
   {
+    href: '/admin/settings/ics',
+    title: 'ICS Einstellungen',
+    description: 'Notizen-Vorlage für Kalender-Einträge anpassen.'
+  },
+  {
     href: '/admin/settings/rechtliches',
     title: 'Rechtstexte',
     description: 'Impressum, Datenschutzerklärung und Cookie-Richtlinie bearbeiten.'

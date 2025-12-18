@@ -1,5 +1,6 @@
 import { ReservationRequest } from '@prisma/client';
 import { ExtraSnapshot, parseExtrasSnapshot } from './pricing';
+import { renderTemplate } from './templates';
 
 function pad(value: number) {
   return value.toString().padStart(2, '0');
@@ -35,38 +36,45 @@ function formatExtras(extras: ExtraSnapshot[]) {
 export function reservationToIcs({
   reservation,
   extras,
-  pricePerGuest
+  pricePerGuest,
+  notesTemplate,
+  summaryPrefix = 'Gesellschaft'
 }: {
   reservation: ReservationRequest;
   extras: ExtraSnapshot[] | null;
   pricePerGuest?: number;
+  notesTemplate: string;
+  summaryPrefix?: string;
 }) {
   const extrasList = extras ?? parseExtrasSnapshot(reservation.extrasSnapshot);
   const start = formatDateTimeLocal(reservation.eventDate, reservation.eventStartTime);
   const end = formatDateTimeLocal(reservation.eventDate, reservation.eventEndTime);
   const now = formatDateTimeLocal(new Date());
   const eventDateLabel = new Intl.DateTimeFormat('de-DE').format(reservation.eventDate);
-  const summary = `Reservierung ${reservation.guestName}`;
+  const summary = `${summaryPrefix} ${reservation.guestName}`;
   const formattedPrice =
     typeof pricePerGuest === 'number'
       ? pricePerGuest.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : undefined;
 
-  const noteLines = [
-    `Gast: ${reservation.guestName} (${reservation.guestEmail})`,
-    `Telefon: ${reservation.guestPhone ?? '-'}`,
-    `Adresse: ${reservation.guestAddress ?? '-'}`,
-    `Datum: ${eventDateLabel} ${reservation.eventStartTime} - ${reservation.eventEndTime}`,
-    `Personen: ${reservation.numberOfGuests}`,
-    `Zahlungsart: ${reservation.paymentMethod}`,
-    `Start Essen: ${reservation.startMeal ?? '-'}`,
-    formattedPrice ? `Preis p. P.: ${formattedPrice} €` : null,
-    `Extras: ${formatExtras(extrasList)}`,
-    `Bemerkungen: ${reservation.extras ?? '-'}`,
-    `Anfrage-ID: ${reservation.id}`
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const noteVariables = {
+    guestName: reservation.guestName,
+    guestEmail: reservation.guestEmail ?? '',
+    guestPhone: reservation.guestPhone ?? '',
+    guestAddress: reservation.guestAddress ?? '',
+    eventDate: eventDateLabel,
+    eventStart: reservation.eventStartTime,
+    eventEnd: reservation.eventEndTime,
+    guests: String(reservation.numberOfGuests),
+    startMeal: reservation.startMeal ?? '',
+    paymentMethod: reservation.paymentMethod,
+    pricePerGuest: formattedPrice ? `${formattedPrice} €` : '',
+    extrasList: formatExtras(extrasList),
+    notes: reservation.extras ?? '',
+    reservationId: reservation.id
+  };
+
+  const noteLines = renderTemplate(notesTemplate, noteVariables);
 
   const location = reservation.guestAddress ?? '';
 

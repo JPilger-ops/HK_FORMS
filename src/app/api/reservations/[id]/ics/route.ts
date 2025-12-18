@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { assertPermission } from '@/lib/rbac';
 import { reservationToIcs } from '@/lib/ics';
 import { parseExtrasSnapshot } from '@/lib/pricing';
-import { getPricePerGuestSetting } from '@/lib/settings';
+import { getIcsTemplateSettings, getPricePerGuestSetting } from '@/lib/settings';
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   await assertPermission('view:requests');
@@ -19,11 +19,13 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     reservation.priceEstimate && reservation.numberOfGuests > 0
       ? Number(reservation.priceEstimate) / reservation.numberOfGuests
       : await getPricePerGuestSetting();
+  const icsTemplate = await getIcsTemplateSettings();
 
   const ics = reservationToIcs({
     reservation,
     extras,
-    pricePerGuest
+    pricePerGuest,
+    notesTemplate: icsTemplate.notes
   });
 
   return new NextResponse(ics, {

@@ -17,6 +17,7 @@ import {
 } from '@/lib/pricing';
 import {
   getEmailTemplateSettings,
+  getIcsTemplateSettings,
   getNotificationSettings,
   getPricePerGuestSetting,
   getReservationTerms
@@ -176,10 +177,12 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     reservationWithSignatures.eventDate
   );
   const extrasForEmail = parseExtrasSnapshot(reservationWithSignatures.extrasSnapshot);
+  const icsTemplate = await getIcsTemplateSettings();
   const ics = reservationToIcs({
     reservation: reservationWithSignatures,
     extras: extrasForEmail,
-    pricePerGuest: pricing.pricePerGuest
+    pricePerGuest: pricing.pricePerGuest,
+    notesTemplate: icsTemplate.notes
   });
   const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   const extrasListEmail =
@@ -240,35 +243,33 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     }
   }
 
-  if (process.env.SEND_GUEST_CONFIRMATION === 'true') {
-    const template = await getEmailTemplateSettings();
-    const vars = {
-      guestName: reservationWithSignatures.guestName,
-      eventDate: eventDateLabel,
-      eventStart: reservationWithSignatures.eventStartTime,
-      eventEnd: reservationWithSignatures.eventEndTime,
-      reservationId: reservationWithSignatures.id
-    };
-    const subject = renderTemplate(template.subject, vars);
-    const bodyHtml = toHtmlParagraphs(renderTemplate(template.body, vars));
+  const template = await getEmailTemplateSettings();
+  const vars = {
+    guestName: reservationWithSignatures.guestName,
+    eventDate: eventDateLabel,
+    eventStart: reservationWithSignatures.eventStartTime,
+    eventEnd: reservationWithSignatures.eventEndTime,
+    reservationId: reservationWithSignatures.id
+  };
+  const subject = renderTemplate(template.subject, vars);
+  const bodyHtml = toHtmlParagraphs(renderTemplate(template.body, vars));
 
-    try {
-      await sendReservationMail({
-        reservationId: reservationWithSignatures.id,
-        to: reservationWithSignatures.guestEmail,
-        subject,
-        html: bodyHtml,
-        attachments: [
-          {
-            filename: `heidekoenig_reservierung_${reservationWithSignatures.id}.ics`,
-            content: ics
-          }
-        ]
-      });
-    } catch (error) {
-      console.error('Guest confirmation email failed', error);
-      emailErrors.push('guest_confirmation');
-    }
+  try {
+    await sendReservationMail({
+      reservationId: reservationWithSignatures.id,
+      to: reservationWithSignatures.guestEmail,
+      subject,
+      html: bodyHtml,
+      attachments: [
+        {
+          filename: `heidekoenig_reservierung_${reservationWithSignatures.id}.ics`,
+          content: ics
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('Guest confirmation email failed', error);
+    emailErrors.push('guest_confirmation');
   }
 
   return { success: true, reservationId: reservationWithSignatures.id, emailErrors };
@@ -310,10 +311,12 @@ export async function sendReservationEmailAction(reservationId: string, recipien
   const pricePerGuest =
     (Number.isFinite(pricePerGuestFromReservation) ? pricePerGuestFromReservation : null) ??
     (await getPricePerGuestSetting());
+  const icsTemplate = await getIcsTemplateSettings();
   const ics = reservationToIcs({
     reservation,
     extras: extrasSnapshot,
-    pricePerGuest
+    pricePerGuest,
+    notesTemplate: icsTemplate.notes
   });
   await sendReservationMail({
     reservationId,

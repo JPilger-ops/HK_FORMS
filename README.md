@@ -25,14 +25,14 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
    # Werte für URLs, NEXTAUTH_SECRET, INVITE_TOKEN_SECRET, DATABASE_URL, SMTP_* setzen
    ```
 3. Image bauen (mit Tag-Version)  
-   ```bash
-   docker build -t hkforms_main-app:0.6.5 .
-   ```
-4. Container starten (Beispiel Docker Compose)  
-   ```bash
-   docker compose up -d          # nutzt docker-compose.yml / compose.yaml
-   # App auf Port 3000, DB auf 5432 (siehe .env)
-   ```
+  ```bash
+  docker build -t hkforms_main-app:0.6.5 .
+  ```
+4. Container starten (Beispiel Docker Compose, App + DB)  
+  ```bash
+  docker compose up -d          # nutzt docker-compose.yml / compose.yaml
+  # App auf Port 3000, DB auf 5432 (siehe .env)
+  ```
    Alternativ `docker run` (ohne Compose):  
    ```bash
    docker run -d --name hkforms \

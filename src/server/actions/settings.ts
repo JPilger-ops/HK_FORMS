@@ -6,6 +6,7 @@ import {
   LegalPageKey,
   emailTemplateDefaults,
   inviteTemplateDefaults,
+  icsTemplateDefaults,
   notificationTemplateDefaults,
   getSetting,
   setSetting
@@ -139,6 +140,13 @@ export async function updateNotificationSettingsAction({
   await setSetting('notification_subject', subject?.trim() ? subject : defaults.subject);
   await setSetting('notification_body', body?.trim() ? body : defaults.body);
   revalidatePath('/admin/settings/notification');
+}
+
+export async function updateIcsTemplateAction({ notes }: { notes: string }) {
+  await assertPermission('manage:settings');
+  const defaults = icsTemplateDefaults;
+  await setSetting('ics_template_notes', notes?.trim() ? notes : defaults.notes);
+  revalidatePath('/admin/settings/ics');
 }
 
 export async function testSmtpSettingsAction() {

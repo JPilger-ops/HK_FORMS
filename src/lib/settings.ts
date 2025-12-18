@@ -257,6 +257,29 @@ export async function getInviteTemplateSettings() {
   };
 }
 
+export const icsTemplateDefaults = {
+  notes: [
+    'Gast: {{guestName}} ({{guestEmail}})',
+    'Telefon: {{guestPhone}}',
+    'Adresse: {{guestAddress}}',
+    'Datum: {{eventDate}} {{eventStart}} - {{eventEnd}}',
+    'Personen: {{guests}}',
+    'Zahlungsart: {{paymentMethod}}',
+    'Start Essen: {{startMeal}}',
+    'Preis p. P.: {{pricePerGuest}}',
+    'Extras: {{extrasList}}',
+    'Bemerkungen: {{notes}}',
+    'Anfrage-ID: {{reservationId}}'
+  ].join('\n')
+};
+
+export async function getIcsTemplateSettings() {
+  const notes = (await getSetting('ics_template_notes')) ?? '';
+  return {
+    notes: notes.trim() ? notes : icsTemplateDefaults.notes
+  };
+}
+
 export const notificationTemplateDefaults = {
   subject: 'Neue Reservierungsanfrage {{guestName}}',
   body: [
