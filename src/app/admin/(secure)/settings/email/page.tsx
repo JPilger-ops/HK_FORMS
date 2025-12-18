@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin/shell';
 import { assertPermission } from '@/lib/rbac';
-import { getEmailTemplateSettings, getSmtpSettings } from '@/lib/settings';
-import { updateEmailTemplateAction, updateSmtpSettingsAction } from '@/server/actions/settings';
+import { getEmailTemplateSettings, getInviteTemplateSettings, getSmtpSettings } from '@/lib/settings';
+import {
+  updateEmailTemplateAction,
+  updateInviteTemplateAction,
+  updateSmtpSettingsAction
+} from '@/server/actions/settings';
 import { primaryButtonClasses, subtleButtonClasses } from '@/app/admin/(secure)/settings/styles';
+import { SmtpTestButton } from '@/components/admin/smtp-test-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +16,7 @@ export default async function EmailSettingsPage() {
   await assertPermission('manage:settings');
   const smtp = await getSmtpSettings();
   const template = await getEmailTemplateSettings();
+  const inviteTemplate = await getInviteTemplateSettings();
   const secureDefault = smtp.secure ?? (smtp.port === 465);
 
   async function saveSmtp(formData: FormData) {
@@ -31,6 +37,13 @@ export default async function EmailSettingsPage() {
     await updateEmailTemplateAction({ subject, body });
   }
 
+  async function saveInviteTemplate(formData: FormData) {
+    'use server';
+    const subject = (formData.get('inviteSubject') as string) ?? '';
+    const body = (formData.get('inviteBody') as string) ?? '';
+    await updateInviteTemplateAction({ subject, body });
+  }
+
   return (
     <AdminShell>
       <div className="space-y-6">
@@ -42,7 +55,9 @@ export default async function EmailSettingsPage() {
             </p>
           </div>
           <span className="text-xs text-slate-500">
-            {'Platzhalter: {{guestName}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{reservationId}}'}
+            {
+              'Gast: {{guestName}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{reservationId}} · Einladung: {{inviteLink}}, {{formKey}}, {{expiresAt}}'
+            }
           </span>
         </div>
 
@@ -127,47 +142,87 @@ export default async function EmailSettingsPage() {
             <button type="submit" className={`${primaryButtonClasses} px-6`}>
               SMTP speichern
             </button>
+            <div className="pt-1">
+              <SmtpTestButton />
+            </div>
           </form>
 
-          <form
-            action={saveTemplate}
-            className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div>
-              <h3 className="text-lg font-semibold text-brand">Vorlage Gastbestätigung</h3>
-              <p className="text-sm text-slate-600">
-                Wird an Gäste gesendet, wenn SEND_GUEST_CONFIRMATION aktiv ist.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Betreff</label>
-              <input
-                name="subject"
-                defaultValue={template.subject}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">E-Mail-Text</label>
-              <textarea
-                name="body"
-                defaultValue={template.body}
-                rows={10}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                {'Absätze mit Leerzeile trennen. Platzhalter mit doppelten geschweiften Klammern einfügen, z. B. {{guestName}}.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-6">
+            <form
+              action={saveTemplate}
+              className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div>
+                <h3 className="text-lg font-semibold text-brand">Vorlage Gastbestätigung</h3>
+                <p className="text-sm text-slate-600">
+                  Wird an Gäste gesendet, wenn SEND_GUEST_CONFIRMATION aktiv ist.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Betreff</label>
+                <input
+                  name="subject"
+                  defaultValue={template.subject}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">E-Mail-Text</label>
+                <textarea
+                  name="body"
+                  defaultValue={template.body}
+                  rows={10}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {'Absätze mit Leerzeile trennen. Platzhalter mit doppelten geschweiften Klammern einfügen, z. B. {{guestName}}.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="submit" className={`${primaryButtonClasses} px-6`}>
+                  Vorlage speichern
+                </button>
+                <Link href="/admin/requests" className={subtleButtonClasses}>
+                  Zur Anfragenliste
+                </Link>
+              </div>
+            </form>
+
+            <form
+              action={saveInviteTemplate}
+              className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div>
+                <h3 className="text-lg font-semibold text-brand">Vorlage E-Mail-Einladung</h3>
+                <p className="text-sm text-slate-600">
+                  Einladungstext für Links zum Reservierungsformular (Admin & API Versand).
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Betreff</label>
+                <input
+                  name="inviteSubject"
+                  defaultValue={inviteTemplate.subject}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">E-Mail-Text</label>
+                <textarea
+                  name="inviteBody"
+                  defaultValue={inviteTemplate.body}
+                  rows={8}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {'Platzhalter: {{inviteLink}}, {{formKey}}, {{expiresAt}}. Der Button mit dem Link wird automatisch angehängt.'}
+                </p>
+              </div>
               <button type="submit" className={`${primaryButtonClasses} px-6`}>
-                Vorlage speichern
+                Einladungsvorlage speichern
               </button>
-              <Link href="/admin/requests" className={subtleButtonClasses}>
-                Zur Anfragenliste
-              </Link>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </AdminShell>

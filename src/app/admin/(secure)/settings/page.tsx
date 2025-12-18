@@ -16,13 +16,18 @@ const cards = [
   },
   {
     href: '/admin/settings/deposit',
-    title: 'Anzahlung',
-    description: 'Anzeige und Höhe einer optionalen Anzahlung in der Preisübersicht.'
+    title: 'Preis & Preisübersicht',
+    description: 'Grundpreis p. P. und optionale Anzahlung für die Preisübersicht verwalten.'
   },
   {
     href: '/admin/settings/email',
     title: 'E-Mail & SMTP',
     description: 'Absenderdaten und Bestätigungs-Vorlage für den E-Mail-Versand pflegen.'
+  },
+  {
+    href: '/admin/settings/notification',
+    title: 'Notification Einstellungen',
+    description: 'E-Mail-Benachrichtigungen für neue Reservierungen konfigurieren.'
   },
   {
     href: '/admin/settings/rechtliches',

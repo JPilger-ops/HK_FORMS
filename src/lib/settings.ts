@@ -61,14 +61,41 @@ function parseNumber(value: string | null, fallback: number) {
 }
 
 function parseOptionalNumber(value: string | null) {
-  const parsed = Number(value);
+  const parsed = Number(value ?? undefined);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseEmailList(value: string | null | undefined) {
+  if (!value) return [];
+  return value
+    .split(/[,\n;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+const PRICE_PER_GUEST_DEFAULT = 35;
+
+export async function getPricePerGuestSetting() {
+  const fromDb = parseOptionalNumber(await getSetting('price_per_guest'));
+  const fromEnv =
+    parseOptionalNumber(process.env.NEXT_PUBLIC_PRICE_PER_GUEST ?? null) ??
+    parseOptionalNumber(process.env.PRICE_PER_PERSON ?? null);
+  const value = fromDb ?? fromEnv ?? PRICE_PER_GUEST_DEFAULT;
+  return value < 0 ? 0 : value;
 }
 
 export async function getDepositSettings() {
   const enabled = parseBoolean(await getSetting('deposit_enabled'), true);
   const amount = parseNumber(await getSetting('deposit_amount'), 300);
   return { enabled, amount };
+}
+
+export async function getPricingSettings() {
+  const [deposit, pricePerGuest] = await Promise.all([
+    getDepositSettings(),
+    getPricePerGuestSetting()
+  ]);
+  return { ...deposit, pricePerGuest };
 }
 
 export type LegalPageKey = 'impressum' | 'datenschutz' | 'cookies';
@@ -206,5 +233,61 @@ export async function getEmailTemplateSettings() {
   return {
     subject: subject.trim() ? subject : emailTemplateDefaults.subject,
     body: body.trim() ? body : emailTemplateDefaults.body
+  };
+}
+
+export const inviteTemplateDefaults = {
+  subject: 'Heidekönig – Reservierungsanfrage',
+  body: [
+    'Hallo,',
+    'bitte füllen Sie Ihre Reservierungsanfrage aus.',
+    'Formular-Link: {{inviteLink}}',
+    'Formular: {{formKey}}',
+    'Gültig bis: {{expiresAt}}'
+  ].join('\n')
+};
+
+export async function getInviteTemplateSettings() {
+  const defaults = inviteTemplateDefaults;
+  const subject = (await getSetting('email_tpl_invite_subject')) ?? '';
+  const body = (await getSetting('email_tpl_invite_body')) ?? '';
+  return {
+    subject: subject.trim() ? subject : defaults.subject,
+    body: body.trim() ? body : defaults.body
+  };
+}
+
+export const notificationTemplateDefaults = {
+  subject: 'Neue Reservierungsanfrage {{guestName}}',
+  body: [
+    'Es liegt eine neue Reservierungsanfrage vor.',
+    'Gast: {{guestName}} ({{guestEmail}})',
+    'Kontakt: {{guestPhone}} · {{guestAddress}}',
+    'Datum: {{eventDate}} ({{eventStart}} - {{eventEnd}})',
+    'Personen: {{guests}} · Start Essen: {{startMeal}} · Zahlungsart: {{paymentMethod}}',
+    'Preis p. P.: {{pricePerGuest}} · Gesamtsumme: {{totalPrice}}',
+    'Extras:',
+    '{{extrasList}}',
+    'Bemerkungen: {{notes}}',
+    'Anfrage-ID: {{reservationId}}'
+  ].join('\n')
+};
+
+export async function getNotificationSettings() {
+  const enabled = parseBoolean(await getSetting('notification_enabled'), true);
+  const defaults = notificationTemplateDefaults;
+  const recipientsSource =
+    (await getSetting('notification_recipients')) ??
+    process.env.ADMIN_NOTIFICATION_EMAILS ??
+    process.env.SMTP_FROM ??
+    '';
+  const subject = (await getSetting('notification_subject')) ?? '';
+  const body = (await getSetting('notification_body')) ?? '';
+
+  return {
+    enabled,
+    recipients: parseEmailList(recipientsSource),
+    subject: subject.trim() ? subject : defaults.subject,
+    body: body.trim() ? body : defaults.body
   };
 }

@@ -46,7 +46,8 @@ export async function sendInviteLinkEmailAction({
     to: recipient,
     token,
     formKey,
-    appUrl: base
+    appUrl: base,
+    expiresAt: invite.expiresAt
   });
   return { link: `${base}/request?token=${token}` };
 }

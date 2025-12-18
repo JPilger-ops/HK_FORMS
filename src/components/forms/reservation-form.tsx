@@ -14,6 +14,7 @@ type Props = {
   enforcedEndTime?: string;
   termsText: string;
   depositSettings: { enabled: boolean; amount: number };
+  pricePerGuest: number;
 };
 
 export function ReservationForm({
@@ -21,8 +22,10 @@ export function ReservationForm({
   extrasOptions,
   enforcedEndTime = '22:30',
   termsText,
-  depositSettings
+  depositSettings,
+  pricePerGuest
 }: Props) {
+  const earliestStart = '17:00';
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -63,8 +66,8 @@ export function ReservationForm({
   }, [rawSelectedExtras]);
 
   const pricing = useMemo(
-    () => calculatePricing(guests, selectedExtras, extrasOptions),
-    [extrasOptions, guests, selectedExtras]
+    () => calculatePricing(guests, selectedExtras, extrasOptions, { pricePerGuest }),
+    [extrasOptions, guests, selectedExtras, pricePerGuest]
   );
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
@@ -180,6 +183,7 @@ export function ReservationForm({
           <label className="block text-sm font-medium text-slate-600">Start Uhrzeit*</label>
           <input
             type="time"
+            min={earliestStart}
             {...register('eventStartTime')}
             className="mt-1 w-full rounded border px-3 py-2"
           />
@@ -191,6 +195,7 @@ export function ReservationForm({
           <label className="block text-sm font-medium text-slate-600">Start Essen*</label>
           <input
             type="time"
+            min={earliestStart}
             {...register('startMeal')}
             className="mt-1 w-full rounded border px-3 py-2"
           />

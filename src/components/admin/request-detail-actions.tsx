@@ -1,34 +1,31 @@
 'use client';
 
 import { ReservationStatus } from '@prisma/client';
-import {
-  attachStaffSignatureAction,
-  sendReservationEmailAction,
-  updateReservationStatusAction
-} from '@/server/actions/reservations';
-import { ComponentType, FormEvent, useState, useTransition } from 'react';
-import SignatureCanvas from 'react-signature-canvas';
+import { sendReservationEmailAction, updateReservationStatusAction } from '@/server/actions/reservations';
+import { FormEvent, useState, useTransition } from 'react';
 
 const statuses: ReservationStatus[] = ['NEW', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'];
 
 type Props = {
   reservationId: string;
   currentStatus: ReservationStatus;
-  appUrl?: string;
 };
 
-export function RequestDetailActions({ reservationId, currentStatus, appUrl }: Props) {
-  const SignatureCanvasAny = SignatureCanvas as unknown as ComponentType<any>;
+export function RequestDetailActions({ reservationId, currentStatus }: Props) {
   const [status, setStatus] = useState<ReservationStatus>(currentStatus);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [signaturePad, setSignaturePad] = useState<SignatureCanvas | null>(null);
 
   const handleStatus = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     startTransition(async () => {
-      await updateReservationStatusAction(reservationId, status);
-      setMessage('Status gespeichert');
+      try {
+        await updateReservationStatusAction(reservationId, status);
+        setMessage({ type: 'success', text: 'Status gespeichert' });
+      } catch (error) {
+        console.error(error);
+        setMessage({ type: 'error', text: 'Status konnte nicht gespeichert werden.' });
+      }
     });
   };
 
@@ -47,26 +44,27 @@ export function RequestDetailActions({ reservationId, currentStatus, appUrl }: P
     startTransition(async () => {
       try {
         await sendReservationEmailAction(reservationId, to);
-        setMessage('E-Mail gesendet');
+        setMessage({ type: 'success', text: 'E-Mail gesendet' });
       } catch (error) {
         console.error(error);
-        setMessage('E-Mail konnte nicht gesendet werden.');
+        setMessage({ type: 'error', text: 'E-Mail konnte nicht gesendet werden.' });
       }
-    });
-  };
-
-  const handleStaffSignature = () => {
-    const data = signaturePad?.toDataURL('image/png');
-    if (!data) return;
-    startTransition(async () => {
-      await attachStaffSignatureAction(reservationId, data);
-      setMessage('Mitarbeiter-Unterschrift gespeichert');
     });
   };
 
   return (
     <div className="space-y-6">
-      {message && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
+      {message && (
+        <p
+          className={`rounded p-3 text-sm ${
+            message.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800'
+              : 'bg-red-50 text-red-700'
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
 
       <form onSubmit={handleStatus} className="flex flex-col gap-3 md:flex-row md:items-center">
         <label className="text-sm font-medium text-slate-600">Status aktualisieren</label>
@@ -103,32 +101,6 @@ export function RequestDetailActions({ reservationId, currentStatus, appUrl }: P
         />
         <button className="rounded border border-brand px-3 py-2 text-sm text-brand">Senden</button>
       </form>
-
-      <div>
-        <p className="text-sm font-medium text-slate-600">Unterschrift Mitarbeiter</p>
-        <SignatureCanvasAny
-          ref={(ref: any) => setSignaturePad(ref ?? null)}
-          penColor="#0f172a"
-          backgroundColor="#fff"
-          canvasProps={{ className: 'mt-2 h-40 w-full rounded border border-slate-300 bg-white' }}
-        />
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => signaturePad?.clear()}
-            className="text-sm text-slate-500 underline"
-          >
-            Löschen
-          </button>
-          <button
-            type="button"
-            onClick={handleStaffSignature}
-            className="text-sm text-brand underline"
-          >
-            Speichern
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

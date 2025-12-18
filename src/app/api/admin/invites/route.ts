@@ -33,7 +33,8 @@ export async function POST(request: Request) {
     to: recipientEmail,
     token,
     formKey,
-    appUrl: formBase
+    appUrl: formBase,
+    expiresAt: invite.expiresAt
   });
 
   return NextResponse.json({ inviteId: invite.id, link });

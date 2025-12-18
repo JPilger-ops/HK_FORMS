@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 import { getPublicFormBaseUrl } from './auth';
-import { getSmtpSettings } from './settings';
+import { getInviteTemplateSettings, getSmtpSettings } from './settings';
+import { renderTemplate, toHtmlParagraphs } from './templates';
 
 type TransporterWithFrom = {
   transporter: nodemailer.Transporter;
@@ -80,30 +81,42 @@ export async function sendInviteEmail({
   to,
   token,
   formKey = 'gesellschaften',
-  appUrl
+  appUrl,
+  expiresAt
 }: {
   inviteId: string;
   to: string;
   token: string;
   formKey?: string;
   appUrl?: string;
+  expiresAt?: Date | string | null;
 }) {
   const { transporter, from } = await getTransporter();
   const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
   const link = `${base}/request?token=${encodeURIComponent(token)}&form=${encodeURIComponent(formKey)}`;
-  const html = `<p>Bitte füllen Sie Ihre Reservierungsanfrage aus.</p><p><a href="${link}" style="padding:10px 14px;background:#39523a;color:white;border-radius:6px;text-decoration:none;">Formular öffnen</a></p><p>Alternativ: ${link}</p>`;
+  const inviteTemplate = await getInviteTemplateSettings();
+  const expiresDate =
+    expiresAt instanceof Date ? expiresAt : expiresAt ? new Date(expiresAt) : null;
+  const expiresLabel =
+    expiresDate && !Number.isNaN(expiresDate.getTime())
+      ? new Intl.DateTimeFormat('de-DE').format(expiresDate)
+      : '';
+  const vars = { inviteLink: link, formKey, expiresAt: expiresLabel };
+  const subject = renderTemplate(inviteTemplate.subject, vars);
+  const body = renderTemplate(inviteTemplate.body, vars);
+  const html = `${toHtmlParagraphs(body)}<p><a href="${link}" style="padding:10px 14px;background:#39523a;color:white;border-radius:6px;text-decoration:none;">Formular öffnen</a></p><p>Alternativ: ${link}</p>`;
   try {
     await transporter.sendMail({
       from,
       to,
-      subject: 'Heidekönig – Reservierungsanfrage',
+      subject,
       html
     });
     await prisma.emailLog.create({
       data: {
         inviteLinkId: inviteId,
         to,
-        subject: 'Heidekönig – Reservierungsanfrage',
+        subject,
         status: 'SENT'
       }
     });
@@ -112,7 +125,7 @@ export async function sendInviteEmail({
       data: {
         inviteLinkId: inviteId,
         to,
-        subject: 'Heidekönig – Reservierungsanfrage',
+        subject,
         status: 'FAILED',
         error: error?.message
       }

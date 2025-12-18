@@ -37,7 +37,8 @@ export async function createAndSendInviteAction({
     to: recipientEmail,
     token,
     formKey,
-    appUrl: formBase
+    appUrl: formBase,
+    expiresAt: invite.expiresAt
   });
   return { inviteId: invite.id, link: `${formBase}/request?token=${token}` };
 }
@@ -72,7 +73,8 @@ export async function resendInviteAction(inviteId: string) {
     to: invite.recipientEmail,
     token,
     formKey: invite.formKey,
-    appUrl: formBase
+    appUrl: formBase,
+    expiresAt: newInvite.expiresAt
   });
   return {
     inviteId: newInvite.id,
