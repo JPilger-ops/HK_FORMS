@@ -5,6 +5,7 @@ import { createInviteLink, validateInviteToken } from '@/lib/tokens';
 import { sendInviteEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
 import { getPublicFormBaseUrl } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
 
 export async function createAndSendInviteAction({
   recipientEmail,
@@ -92,13 +93,17 @@ export async function listInvitesAction(limit = 50) {
 
 export async function deleteInvitesAction(inviteIds: string[]) {
   await assertPermission('edit:requests');
-  const ids = inviteIds.filter(Boolean);
+  const ids = Array.from(new Set(inviteIds.filter(Boolean)));
   if (!ids.length) return { deleted: 0 };
-  const result = await prisma.inviteLink.updateMany({
-    where: { id: { in: ids } },
-    data: { isRevoked: true }
+
+  const deleted = await prisma.$transaction(async (tx) => {
+    await tx.emailLog.deleteMany({ where: { inviteLinkId: { in: ids } } });
+    const result = await tx.inviteLink.deleteMany({ where: { id: { in: ids } } });
+    return result.count;
   });
-  return { deleted: result.count };
+
+  revalidatePath('/admin/invites');
+  return { deleted };
 }
 
 export async function validateInviteForApi(token: string) {

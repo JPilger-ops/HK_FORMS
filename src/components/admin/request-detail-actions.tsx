@@ -3,6 +3,7 @@
 import { ReservationStatus } from '@prisma/client';
 import { sendReservationEmailAction, updateReservationStatusAction } from '@/server/actions/reservations';
 import { FormEvent, useState, useTransition } from 'react';
+import { ActionFeedback } from '@/components/admin/action-feedback';
 
 const statuses: ReservationStatus[] = ['NEW', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'];
 
@@ -54,17 +55,7 @@ export function RequestDetailActions({ reservationId, currentStatus }: Props) {
 
   return (
     <div className="space-y-6">
-      {message && (
-        <p
-          className={`rounded p-3 text-sm ${
-            message.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800'
-              : 'bg-red-50 text-red-700'
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
+      <ActionFeedback message={message} />
 
       <form onSubmit={handleStatus} className="flex flex-col gap-3 md:flex-row md:items-center">
         <label className="text-sm font-medium text-slate-600">Status aktualisieren</label>
