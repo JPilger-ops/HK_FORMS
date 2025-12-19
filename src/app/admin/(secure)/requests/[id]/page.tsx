@@ -9,6 +9,7 @@ import { calculatePricing, parseExtrasSnapshot } from '@/lib/pricing';
 import { getPricePerGuestSetting } from '@/lib/settings';
 import { mapExtraToInput } from '@/server/extras';
 import { CopyToClipboard } from '@/components/admin/copy-to-clipboard';
+import { updateInternalNotesAction } from '@/server/actions/reservations';
 
 function parseSelectedExtraIds(value?: string | null) {
   if (!value) return [];
@@ -304,17 +305,10 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             )}
           </div>
 
-          {(reservation.internalResponsible || reservation.internalNotes) && (
+          {reservation.internalResponsible && (
             <div className="rounded border border-slate-200 p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">Interne Felder</p>
-              {reservation.internalResponsible && (
-                <p className="text-sm text-slate-600">
-                  Zuständig: {reservation.internalResponsible}
-                </p>
-              )}
-              {reservation.internalNotes && (
-                <p className="text-sm text-slate-600">Notizen: {reservation.internalNotes}</p>
-              )}
+              <p className="text-sm text-slate-600">Zuständig: {reservation.internalResponsible}</p>
             </div>
           )}
 
@@ -370,6 +364,30 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             reservationId={reservation.id}
             currentStatus={reservation.status}
           />
+
+          <div className="mt-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+            <form action={updateInternalNotesAction.bind(null, reservation.id)} className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold">Interne Notiz</h3>
+                <button
+                  type="submit"
+                  className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-brand/90"
+                >
+                  Speichern
+                </button>
+              </div>
+              <textarea
+                name="internalNotes"
+                defaultValue={reservation.internalNotes ?? ''}
+                rows={5}
+                className="w-full rounded border border-slate-200 px-3 py-2 text-sm leading-relaxed"
+                placeholder="Kurze interne Notiz hinzufügen (nicht sichtbar für Gäste)"
+              />
+              <p className="text-xs text-slate-500">
+                Nur für das Team sichtbar. Die Notiz wird gespeichert, aber nicht versendet.
+              </p>
+            </form>
+          </div>
 
           <div className="mt-6">
             <h3 className="text-lg font-semibold">Audit Log</h3>

@@ -379,3 +379,27 @@ export async function getNotificationSettings() {
     body: body.trim() ? body : defaults.body
   };
 }
+
+export type ReWebAppSettings = {
+  enabled: boolean;
+  baseUrl: string | null;
+  apiKey: string | null;
+  organizationId: string | null;
+};
+
+export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
+  const enabledSetting = parseOptionalBoolean(await getSetting('re_webapp_enabled'));
+  const enabledEnv = parseOptionalBoolean(process.env.RE_WEBAPP_ENABLED ?? null);
+  const enabled = enabledSetting ?? enabledEnv ?? false;
+  const baseUrl =
+    normalizeString(await getSetting('re_webapp_base_url')) ??
+    normalizeString(process.env.RE_WEBAPP_BASE_URL);
+  const apiKey =
+    normalizeString(await getSetting('re_webapp_api_key')) ??
+    normalizeString(process.env.RE_WEBAPP_API_KEY);
+  const organizationId =
+    normalizeString(await getSetting('re_webapp_org_id')) ??
+    normalizeString(process.env.RE_WEBAPP_ORG_ID);
+
+  return { enabled, baseUrl, apiKey, organizationId };
+}

@@ -35,7 +35,7 @@ export default async function IcsSettingsPage() {
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2"
             />
             <p className="mt-1 text-xs text-slate-500">
-              Platzhalter: {'{{guestName}}, {{guestEmail}}, {{guestPhone}}, {{guestAddress}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{guests}}, {{startMeal}}, {{paymentMethod}}, {{pricePerGuest}}, {{extrasList}}, {{notes}}, {{reservationId}}'}
+              Platzhalter: {'{{guestName}}, {{guestCompany}}, {{guestEmail}}, {{guestPhone}}, {{guestAddress}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{guests}}, {{startMeal}}, {{paymentMethod}}, {{pricePerGuest}}, {{extrasList}}, {{notes}}, {{dietaryNotes}}, {{vegetarianGuests}}, {{veganGuests}}, {{reservationId}}'}
             </p>
           </div>
           <button type="submit" className={`${primaryButtonClasses} px-6`}>

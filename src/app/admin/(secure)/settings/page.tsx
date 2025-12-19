@@ -30,6 +30,11 @@ const cards = [
     description: 'E-Mail-Benachrichtigungen für neue Reservierungen konfigurieren.'
   },
   {
+    href: '/admin/settings/re-webapp',
+    title: 'RE-WebAPP Verbindung',
+    description: 'API-URL und Schlüssel für die RE-WebAPP-Anbindung verwalten.'
+  },
+  {
     href: '/admin/settings/ics',
     title: 'ICS Einstellungen',
     description: 'Notizen-Vorlage für Kalender-Einträge anpassen.'

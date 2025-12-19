@@ -336,6 +336,19 @@ export async function updateReservationStatusAction(
   return updated;
 }
 
+export async function updateInternalNotesAction(reservationId: string, formData: FormData) {
+  const session = await assertPermission('edit:requests');
+  const notes = (formData.get('internalNotes') as string) ?? '';
+  const trimmed = notes.trim();
+  await prisma.reservationRequest.update({
+    where: { id: reservationId },
+    data: { internalNotes: trimmed.length > 0 ? trimmed : null }
+  });
+  await writeAuditLog({ reservationId, userId: session.user?.id, action: 'NOTE:UPDATED' });
+  revalidatePath(`/admin/requests/${reservationId}`);
+  return { success: true };
+}
+
 export async function sendReservationEmailAction(reservationId: string, recipients: string[]) {
   const session = await assertPermission('send:emails');
   const reservation = await prisma.reservationRequest.findUnique({
