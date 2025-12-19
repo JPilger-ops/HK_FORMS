@@ -8,6 +8,7 @@ import { assertPermission } from '@/lib/rbac';
 import { calculatePricing, parseExtrasSnapshot } from '@/lib/pricing';
 import { getPricePerGuestSetting } from '@/lib/settings';
 import { mapExtraToInput } from '@/server/extras';
+import { CopyToClipboard } from '@/components/admin/copy-to-clipboard';
 
 function parseSelectedExtraIds(value?: string | null) {
   if (!value) return [];
@@ -95,6 +96,23 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   const combinedNotes = [reservation.extras?.trim() ? reservation.extras.trim() : null, dietaryNotes || null]
     .filter(Boolean)
     .join(' | ');
+  const formatDate = (value?: Date | null) =>
+    value ? new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(value) : null;
+  const invoiceStatus = reservation.invoiceStatus ?? 'NONE';
+  const invoiceBadge: Record<string, string> = {
+    NONE: 'bg-slate-100 text-slate-700 border-slate-200',
+    SENT: 'bg-blue-100 text-blue-800 border-blue-200',
+    PAID: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    OVERDUE: 'bg-amber-100 text-amber-800 border-amber-200'
+  };
+  const invoiceLabels: Record<string, string> = {
+    NONE: 'Keine Rechnung hinterlegt',
+    SENT: 'Versendet',
+    PAID: 'Bezahlt',
+    OVERDUE: 'Überfällig'
+  };
+  const invoiceReference = reservation.invoiceReference ?? '';
+  const isUrl = invoiceReference.startsWith('http://') || invoiceReference.startsWith('https://');
 
   return (
     <AdminShell>
@@ -119,6 +137,13 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             <div>
               <dt className="text-slate-500">Gastgeber</dt>
               <dd className="font-medium">{hostFullName}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Anfrage-ID</dt>
+              <dd className="flex items-center gap-2 font-mono text-xs text-slate-700">
+                <span>{reservation.id}</span>
+                <CopyToClipboard value={reservation.id} ariaLabel="Anfrage-ID kopieren" />
+              </dd>
             </div>
             {hostCompany && (
               <div>
@@ -217,6 +242,55 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             <p className="mt-3 text-sm text-slate-600">
               Bemerkungen / Unverträglichkeiten: {combinedNotes || 'Keine Angaben'}
             </p>
+          </div>
+
+          <div className="mt-4 rounded border border-slate-200 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Rechnung</p>
+              <span
+                className={`rounded-full border px-2 py-1 text-xs font-semibold ${invoiceBadge[invoiceStatus] ?? invoiceBadge.NONE}`}
+              >
+                {invoiceLabels[invoiceStatus] ?? invoiceStatus}
+              </span>
+            </div>
+            {invoiceStatus === 'NONE' &&
+            !invoiceReference &&
+            !reservation.invoiceSentAt &&
+            !reservation.invoicePaidAt &&
+            !reservation.invoiceOverdueSince ? (
+              <p className="mt-2 text-sm text-slate-600">Keine Rechnungsdaten vorhanden.</p>
+            ) : (
+              <dl className="mt-3 space-y-2 text-sm text-slate-700">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Referenz</dt>
+                  <dd className="text-right">
+                    {invoiceReference ? (
+                      isUrl ? (
+                        <a href={invoiceReference} className="text-brand underline" target="_blank" rel="noreferrer">
+                          Im CRM öffnen
+                        </a>
+                      ) : (
+                        invoiceReference
+                      )
+                    ) : (
+                      <span className="text-slate-500">Keine Angabe</span>
+                    )}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Versendet am</dt>
+                  <dd>{formatDate(reservation.invoiceSentAt) ?? '–'}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Bezahlt am</dt>
+                  <dd>{formatDate(reservation.invoicePaidAt) ?? '–'}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Überfällig seit</dt>
+                  <dd>{formatDate(reservation.invoiceOverdueSince) ?? '–'}</dd>
+                </div>
+              </dl>
+            )}
           </div>
 
           {(reservation.internalResponsible || reservation.internalNotes) && (
