@@ -6,6 +6,7 @@ import { Buffer } from 'node:buffer';
 import { getBaseUrl } from '@/lib/auth';
 import { assertPermission } from '@/lib/rbac';
 import { calculatePricing, parseExtrasSnapshot } from '@/lib/pricing';
+import { getPricePerGuestSetting } from '@/lib/settings';
 import { mapExtraToInput } from '@/server/extras';
 
 function parseSelectedExtraIds(value?: string | null) {
@@ -31,12 +32,13 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     notFound();
   }
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
-  const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const base = getBaseUrl();
   const legacy = (reservation.legacyData ?? {}) as Record<string, any>;
   const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   const formatMoney = (value?: any) =>
     value || value === 0 ? euro.format(Number(value ?? 0)) : '-';
+  const formatPortions = (value?: number | null) =>
+    typeof value === 'number' ? `${value} Portionen` : 'Keine Angabe';
   const extrasSnapshot = parseExtrasSnapshot(reservation.extrasSnapshot);
   const selectedFromLegacy = parseSelectedExtraIds(reservation.extrasSelection);
   const selectedExtras = extrasSnapshot.length
@@ -48,7 +50,16 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
       : [];
   const extrasForPricing =
     extrasSnapshot.length > 0 ? extrasSnapshot : extrasFromDb.map(mapExtraToInput);
-  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtras, extrasForPricing);
+  const pricePerGuestFromReservation =
+    reservation.priceEstimate && reservation.numberOfGuests > 0
+      ? Number(reservation.priceEstimate) / reservation.numberOfGuests
+      : null;
+  const pricePerGuest =
+    (Number.isFinite(pricePerGuestFromReservation) ? pricePerGuestFromReservation : null) ??
+    (await getPricePerGuestSetting());
+  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtras, extrasForPricing, {
+    pricePerGuest
+  });
   const basePrice = reservation.priceEstimate ? Number(reservation.priceEstimate) : pricing.base;
   const totalPrice = reservation.totalPrice ? Number(reservation.totalPrice) : pricing.total;
   const extrasTotal = pricing.extrasTotal || Math.max(0, totalPrice - basePrice);
@@ -72,6 +83,17 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     hostAddressParts.length > 0
       ? hostAddressParts.join(', ')
       : (reservation.guestAddress ?? (legacy.guestAddress as string) ?? '-');
+  const dietaryNotes = [
+    typeof reservation.vegetarianGuests === 'number'
+      ? `${reservation.vegetarianGuests}× vegetarisch`
+      : null,
+    typeof reservation.veganGuests === 'number' ? `${reservation.veganGuests}× vegan` : null
+  ]
+    .filter(Boolean)
+    .join(' | ');
+  const combinedNotes = [reservation.extras?.trim() ? reservation.extras.trim() : null, dietaryNotes || null]
+    .filter(Boolean)
+    .join(' | ');
 
   return (
     <AdminShell>
@@ -84,6 +106,12 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               className="rounded border border-brand px-3 py-2 text-sm text-brand"
             >
               PDF herunterladen
+            </a>
+            <a
+              href={`/api/reservations/${reservation.id}/ics`}
+              className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-700"
+            >
+              ICS herunterladen
             </a>
           </div>
           <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -124,6 +152,14 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             <div>
               <dt className="text-slate-500">Personenzahl</dt>
               <dd>{reservation.numberOfGuests}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Vegetarisch</dt>
+              <dd>{formatPortions(reservation.vegetarianGuests)}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Vegan</dt>
+              <dd>{formatPortions(reservation.veganGuests)}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Zahlungsart</dt>
@@ -171,11 +207,9 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
                 Extras wurden übernommen, Details liegen nur als Summe vor.
               </p>
             )}
-            {reservation.extras && (
-              <p className="mt-3 text-sm text-slate-600">
-                Bemerkungen / Unverträglichkeiten: {reservation.extras}
-              </p>
-            )}
+            <p className="mt-3 text-sm text-slate-600">
+              Bemerkungen / Unverträglichkeiten: {combinedNotes || 'Keine Angaben'}
+            </p>
           </div>
 
           {(reservation.internalResponsible || reservation.internalNotes) && (
@@ -208,7 +242,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             )}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div>
             <div>
               <p className="text-sm font-medium">Gast Unterschrift</p>
               {hostSignature ? (
@@ -220,19 +254,6 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
                 />
               ) : (
                 <p className="text-sm text-slate-500">Nicht vorhanden</p>
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-medium">Mitarbeiter Unterschrift</p>
-              {staffSignature ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`data:image/png;base64,${Buffer.from(staffSignature.imageData).toString('base64')}`}
-                  alt="Staff signature"
-                  className="mt-2 h-32 w-full rounded border object-contain"
-                />
-              ) : (
-                <p className="text-sm text-slate-500">Noch nicht erfasst</p>
               )}
             </div>
           </div>
@@ -256,7 +277,6 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
           <RequestDetailActions
             reservationId={reservation.id}
             currentStatus={reservation.status}
-            appUrl={base}
           />
 
           <div className="mt-6">

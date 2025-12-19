@@ -3,6 +3,7 @@ import { ReservationRequest, Signature } from '@prisma/client';
 import { ExtraOptionInput, calculatePricing, parseExtrasSnapshot } from './pricing';
 import { prisma } from './prisma';
 import { mapExtraToInput } from '@/server/extras';
+import { getPricePerGuestSetting } from './settings';
 
 function parseSelectedExtraIds(value?: string | null) {
   if (!value) return [];
@@ -17,14 +18,13 @@ function parseSelectedExtraIds(value?: string | null) {
   return [];
 }
 
-function buildHtml(
+async function buildHtml(
   reservation: ReservationRequest & { signatures: Signature[] },
   extrasOptions: ExtraOptionInput[],
   selectedExtraIds: string[]
 ) {
   const legacy = (reservation as any).legacyData ?? {};
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
-  const staffSignature = reservation.signatures.find((s) => s.type === 'STAFF');
   const signatureImg = (sig?: Signature) =>
     sig
       ? `<img src="data:image/png;base64,${Buffer.from(sig.imageData).toString('base64')}" style="width:200px">`
@@ -51,7 +51,17 @@ function buildHtml(
     (legacy.guestAddress as string) ||
     '-';
 
-  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtraIds, extrasOptions);
+  const pricePerGuestFromReservation =
+    reservation.priceEstimate && reservation.numberOfGuests > 0
+      ? Number(reservation.priceEstimate) / reservation.numberOfGuests
+      : null;
+  const pricePerGuest =
+    (Number.isFinite(pricePerGuestFromReservation) ? pricePerGuestFromReservation : null) ??
+    (await getPricePerGuestSetting());
+
+  const pricing = calculatePricing(reservation.numberOfGuests, selectedExtraIds, extrasOptions, {
+    pricePerGuest
+  });
   const basePrice = reservation.priceEstimate ? Number(reservation.priceEstimate) : pricing.base;
   const totalPrice = reservation.totalPrice ? Number(reservation.totalPrice) : pricing.total;
   const extrasTotal = pricing.extrasTotal || Math.max(0, totalPrice - basePrice);
@@ -66,6 +76,25 @@ function buildHtml(
           )
           .join('')}</ul>`
       : '<em>Keine</em>';
+  const vegetarianLabel =
+    typeof reservation.vegetarianGuests === 'number'
+      ? `${reservation.vegetarianGuests} Portionen`
+      : '-';
+  const veganLabel =
+    typeof reservation.veganGuests === 'number' ? `${reservation.veganGuests} Portionen` : '-';
+  const dietaryNotes = [reservation.vegetarianGuests, reservation.veganGuests]
+    .map((count, index) =>
+      typeof count === 'number'
+        ? `${count}× ${index === 0 ? 'vegetarisch' : 'vegan'}`
+        : null
+    )
+    .filter(Boolean)
+    .join(' | ');
+  const notesParts = [
+    reservation.extras && reservation.extras.trim().length ? reservation.extras.trim() : null,
+    dietaryNotes || null
+  ].filter(Boolean);
+  const combinedNotes = notesParts.join(' | ') || '-';
 
   return `<!DOCTYPE html>
   <html>
@@ -105,6 +134,8 @@ function buildHtml(
         <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime ?? '22:30'}</td></tr>
         <tr><th>Start Essen</th><td>${reservation.startMeal ?? '-'}</td></tr>
         <tr><th>Personenzahl</th><td>${reservation.numberOfGuests}</td></tr>
+        <tr><th>Vegetarisch</th><td>${vegetarianLabel}</td></tr>
+        <tr><th>Vegan</th><td>${veganLabel}</td></tr>
       </table>
     </div>
 
@@ -117,15 +148,14 @@ function buildHtml(
         <tr><th>Grundpreis</th><td>${price(basePrice)}</td></tr>
         <tr><th>Extras Summe</th><td>${price(extrasTotal)}</td></tr>
         <tr><th>Total</th><td>${price(totalPrice)}</td></tr>
-        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${reservation.extras ?? '-'}</td></tr>
+        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${combinedNotes}</td></tr>
       </table>
     </div>
 
     <div class="section">
-      <h2>Unterschriften</h2>
+      <h2>Unterschrift</h2>
       <table>
         <tr><th>Gast</th><td>${signatureImg(hostSignature)}</td></tr>
-        <tr><th>Mitarbeiter</th><td>${signatureImg(staffSignature)}</td></tr>
       </table>
     </div>
 
@@ -179,7 +209,7 @@ export async function reservationToPdf(
 
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  await page.setContent(buildHtml(reservation, extrasOptions, selectedExtraIds), {
+  await page.setContent(await buildHtml(reservation, extrasOptions, selectedExtraIds), {
     waitUntil: 'networkidle'
   });
   const buffer = await page.pdf({

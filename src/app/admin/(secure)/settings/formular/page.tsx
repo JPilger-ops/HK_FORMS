@@ -13,7 +13,7 @@ import {
   dangerButtonClasses,
   iconButtonClasses,
   primaryButtonClasses
-} from '@/components/admin/settings/button-styles';
+} from '@/app/admin/(secure)/settings/styles';
 
 export default async function FormularSettingsPage() {
   await assertPermission('manage:settings');
@@ -102,14 +102,14 @@ export default async function FormularSettingsPage() {
                     <form action={moveExtra}>
                       <input type="hidden" name="id" value={extra.id} />
                       <input type="hidden" name="direction" value="up" />
-                      <button className={`${iconButtonClasses} text-sm`} type="submit">
+                      <button className={iconButtonClasses} type="submit">
                         ↑
                       </button>
                     </form>
                     <form action={moveExtra}>
                       <input type="hidden" name="id" value={extra.id} />
                       <input type="hidden" name="direction" value="down" />
-                      <button className={`${iconButtonClasses} text-sm`} type="submit">
+                      <button className={iconButtonClasses} type="submit">
                         ↓
                       </button>
                     </form>
@@ -176,14 +176,14 @@ export default async function FormularSettingsPage() {
                       />
                       Aktiv im Formular anzeigen
                     </label>
-                    <button className={`${primaryButtonClasses} text-xs px-3 py-2`}>
+                    <button className={`${primaryButtonClasses} px-4 py-2 text-xs md:text-sm`}>
                       Speichern
                     </button>
                   </form>
                 </details>
                 <form action={deleteExtra} className="mt-2">
                   <input type="hidden" name="id" value={extra.id} />
-                  <button type="submit" className={`${dangerButtonClasses} text-xs px-3 py-2`}>
+                  <button type="submit" className={`${dangerButtonClasses} text-xs md:text-sm`}>
                     Löschen
                   </button>
                 </form>

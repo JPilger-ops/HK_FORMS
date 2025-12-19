@@ -36,7 +36,10 @@ describe('reservationToPdf', () => {
       eventType: 'Feier',
       eventStartTime: '12:00',
       eventEndTime: '14:00',
+      startMeal: '12:30',
       numberOfGuests: 10,
+      vegetarianGuests: 2,
+      veganGuests: 1,
       paymentMethod: 'Rechnung',
       extrasSelection: '["drinks"]',
       extrasSnapshot: [

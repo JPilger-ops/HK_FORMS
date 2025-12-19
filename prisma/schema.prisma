@@ -61,6 +61,8 @@ model ReservationRequest {
   eventEndTime        String
   startMeal           String?
   numberOfGuests      Int
+  vegetarianGuests    Int?
+  veganGuests         Int?
   paymentMethod       String
   extrasSelection     String?           @db.Text
   extrasSnapshot      Json?

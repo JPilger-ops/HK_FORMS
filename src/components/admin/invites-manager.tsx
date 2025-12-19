@@ -8,6 +8,8 @@ import {
   resendInviteAction,
   revokeInviteAction
 } from '@/server/actions/admin-invites';
+import { ActionFeedback } from '@/components/admin/action-feedback';
+import { dangerButtonClasses, subtleButtonClasses } from '@/app/admin/(secure)/settings/styles';
 
 type Invite = {
   id: string;
@@ -66,13 +68,16 @@ export function InvitesManager({
     const ids = Array.from(selected);
     startTransition(async () => {
       try {
-        await deleteInvitesAction(ids);
-        setMessage({ type: 'success', text: `${ids.length} Einladungen widerrufen` });
+        const { deleted } = await deleteInvitesAction(ids);
+        setMessage({
+          type: 'success',
+          text: deleted === 1 ? 'Einladung gelöscht' : `${deleted} Einladungen gelöscht`
+        });
         setSelected(new Set());
         router.refresh();
       } catch (error) {
         console.error(error);
-        setMessage({ type: 'error', text: 'Widerrufen fehlgeschlagen' });
+        setMessage({ type: 'error', text: 'Löschen fehlgeschlagen' });
       }
     });
   };
@@ -135,26 +140,21 @@ export function InvitesManager({
             <h2 className="text-xl font-semibold">Einladungen</h2>
             <p className="text-sm text-slate-500">Neueste 50 Einladungen</p>
           </div>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            disabled={!anySelected || isLoading}
-            className="rounded border border-red-200 px-3 py-2 text-xs text-red-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Lösche…' : 'Auswahl löschen'}
-          </button>
+          <div className="flex items-center gap-2">
+            {anySelected && (
+              <span className="text-xs text-slate-500">{selected.size} markiert</span>
+            )}
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={!anySelected || isLoading}
+              className={`${dangerButtonClasses} px-4 text-xs disabled:opacity-60`}
+            >
+              {isLoading ? 'Lösche…' : 'Auswahl löschen'}
+            </button>
+          </div>
         </div>
-        {message && (
-          <p
-            className={`mt-3 rounded p-3 text-sm ${
-              message.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800'
-                : 'bg-red-50 text-red-700'
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
+        <ActionFeedback message={message} />
         <div className="mt-4 space-y-3">
           {invites.map((invite) => (
             <div key={invite.id} className="rounded border p-3 text-sm">
@@ -186,7 +186,7 @@ export function InvitesManager({
                       type="button"
                       onClick={() => handleResend(invite.id)}
                       disabled={isLoading}
-                      className="text-brand underline disabled:opacity-50"
+                      className={`${subtleButtonClasses} px-3 text-xs font-semibold text-brand`}
                     >
                       Neu senden
                     </button>
@@ -195,7 +195,7 @@ export function InvitesManager({
                         type="button"
                         onClick={() => handleRevoke(invite.id)}
                         disabled={isLoading}
-                        className="text-red-600 underline disabled:opacity-50"
+                        className={`${subtleButtonClasses} px-3 text-xs font-semibold text-red-700`}
                       >
                         Widerrufen
                       </button>
