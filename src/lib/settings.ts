@@ -215,6 +215,7 @@ export const emailTemplateDefaults = {
   subject: 'Ihre Anfrage bei der Waldwirtschaft Heidekönig',
   body: [
     'Hallo {{guestName}},',
+    'Firma: {{guestCompany}}',
     '',
     'vielen Dank für Ihre Reservierungsanfrage am {{eventDate}} ({{eventStart}} - {{eventEnd}}).',
     'Wir prüfen die Verfügbarkeit und melden uns zeitnah mit einem Angebot.',
@@ -225,7 +226,9 @@ export const emailTemplateDefaults = {
     'Freundliche Grüße',
     'Ihr Team der Waldwirtschaft Heidekönig',
     '',
-    'Veggie/Vegan: {{dietaryNotes}}'
+    'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}'
   ].join('\n')
 };
 
@@ -262,6 +265,7 @@ export async function getInviteTemplateSettings() {
 export const icsTemplateDefaults = {
   notes: [
     'Gast: {{guestName}} ({{guestEmail}})',
+    'Firma: {{guestCompany}}',
     'Telefon: {{guestPhone}}',
     'Adresse: {{guestAddress}}',
     'Datum: {{eventDate}} {{eventStart}} - {{eventEnd}}',
@@ -271,6 +275,8 @@ export const icsTemplateDefaults = {
     'Preis p. P.: {{pricePerGuest}}',
     'Extras: {{extrasList}}',
     'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}',
     'Bemerkungen: {{notes}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
@@ -288,6 +294,7 @@ export const notificationTemplateDefaults = {
   body: [
     'Es liegt eine neue Reservierungsanfrage vor.',
     'Gast: {{guestName}} ({{guestEmail}})',
+    'Firma: {{guestCompany}}',
     'Kontakt: {{guestPhone}} · {{guestAddress}}',
     'Datum: {{eventDate}} ({{eventStart}} - {{eventEnd}})',
     'Personen: {{guests}} · Start Essen: {{startMeal}} · Zahlungsart: {{paymentMethod}}',
@@ -296,6 +303,8 @@ export const notificationTemplateDefaults = {
     '{{extrasList}}',
     'Bemerkungen: {{notes}}',
     'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
 };

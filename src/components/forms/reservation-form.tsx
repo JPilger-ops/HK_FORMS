@@ -17,6 +17,24 @@ type Props = {
   pricePerGuest: number;
 };
 
+function InfoHint({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex items-center">
+      <button
+        type="button"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        aria-label={`Hinweis: ${text}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        i
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-md bg-slate-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function ReservationForm({
   inviteToken,
   extrasOptions,
@@ -41,6 +59,7 @@ export function ReservationForm({
     defaultValues: {
       hostFirstName: '',
       hostLastName: '',
+      hostCompany: '',
       hostStreet: '',
       hostPostalCode: '',
       hostCity: '',
@@ -133,36 +152,56 @@ export function ReservationForm({
       <input type="hidden" {...register('signature')} />
       <section className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Vorname*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Vorname* <InfoHint text="Wie er im Vertrag oder auf der Rechnung stehen soll." />
+          </label>
           <input {...register('hostFirstName')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.hostFirstName && (
             <p className="text-sm text-red-600">{errors.hostFirstName.message}</p>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Nachname*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Nachname* <InfoHint text="Nachname der Ansprechperson vor Ort." />
+          </label>
           <input {...register('hostLastName')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.hostLastName && (
             <p className="text-sm text-red-600">{errors.hostLastName.message}</p>
+          )}
+        </div>
+        <div className="md:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Firmenname <InfoHint text="Optional für Rechnungsanschrift oder Firmenfeier." />
+          </label>
+          <input {...register('hostCompany')} className="mt-1 w-full rounded border px-3 py-2" />
+          {errors.hostCompany && (
+            <p className="text-sm text-red-600">{errors.hostCompany.message}</p>
           )}
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-600">Straße + Hausnummer*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Straße + Hausnummer*{' '}
+            <InfoHint text="Adresse für Rückfragen, Rechnungsversand oder Angebote." />
+          </label>
           <input {...register('hostStreet')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.hostStreet && <p className="text-sm text-red-600">{errors.hostStreet.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">PLZ*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            PLZ* <InfoHint text="Postleitzahl der Rechnungs- bzw. Kontaktadresse." />
+          </label>
           <input {...register('hostPostalCode')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.hostPostalCode && (
             <p className="text-sm text-red-600">{errors.hostPostalCode.message}</p>
           )}
         </div>
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-600">Ort*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Ort* <InfoHint text="Ort der Kontakt-/Rechnungsadresse." />
+          </label>
           <input {...register('hostCity')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.hostCity && <p className="text-sm text-red-600">{errors.hostCity.message}</p>}
         </div>
@@ -170,7 +209,9 @@ export function ReservationForm({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Telefon*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Telefon* <InfoHint text="Für Rückfragen und Abstimmungen am Veranstaltungstag." />
+          </label>
           <input
             type="tel"
             {...register('hostPhone')}
@@ -179,7 +220,9 @@ export function ReservationForm({
           {errors.hostPhone && <p className="text-sm text-red-600">{errors.hostPhone.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">E-Mail*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            E-Mail* <InfoHint text="Hierhin schicken wir Rückfragen und die Bestätigung." />
+          </label>
           <input
             type="email"
             {...register('hostEmail')}
@@ -191,7 +234,10 @@ export function ReservationForm({
 
       <section className="grid gap-4 md:grid-cols-3">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Veranstaltungsdatum*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Veranstaltungsdatum*{' '}
+            <InfoHint text="Datum der Feier im Format TT.MM.JJJJ." />
+          </label>
           <input
             type="date"
             {...register('eventDate')}
@@ -200,7 +246,9 @@ export function ReservationForm({
           {errors.eventDate && <p className="text-sm text-red-600">{errors.eventDate.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Start Uhrzeit*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Start Uhrzeit* <InfoHint text="Geplanter Beginn, frühestens 17:00 Uhr." />
+          </label>
           <input
             type="time"
             min={earliestStart}
@@ -212,7 +260,9 @@ export function ReservationForm({
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Start Essen*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Start Essen* <InfoHint text="Wann das Essen serviert werden soll." />
+          </label>
           <input
             type="time"
             min={earliestStart}
@@ -222,7 +272,9 @@ export function ReservationForm({
           {errors.startMeal && <p className="text-sm text-red-600">{errors.startMeal.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">End Uhrzeit</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            End Uhrzeit <InfoHint text="Feste Endzeit. Anpassungen bitte direkt abstimmen." />
+          </label>
           <input
             type="time"
             readOnly
@@ -235,12 +287,16 @@ export function ReservationForm({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Anlass*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Anlass* <InfoHint text="Art der Veranstaltung, z. B. Hochzeit, Geburtstag, Firmenfeier." />
+          </label>
           <input {...register('eventType')} className="mt-1 w-full rounded border px-3 py-2" />
           {errors.eventType && <p className="text-sm text-red-600">{errors.eventType.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Personenzahl*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Personenzahl* <InfoHint text="Gesamtanzahl aller Gäste inkl. Kinder." />
+          </label>
           <input
             type="number"
             min={1}
@@ -255,7 +311,10 @@ export function ReservationForm({
 
       <section className="rounded border border-slate-200 bg-slate-50 p-4 shadow-inner">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold text-brand">Vegan / Vegetarisch</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-brand">Vegan / Vegetarisch</h3>
+            <InfoHint text="Nur ausfüllen, wenn vegetarische oder vegane Portionen benötigt werden." />
+          </div>
           <p className="text-xs text-slate-500">Optional, ohne Preisänderung</p>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -267,7 +326,10 @@ export function ReservationForm({
                 className="mt-1 h-4 w-4 rounded border-slate-400"
               />
               <div className="flex-1">
-                <p className="font-medium">Vegetarisch</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">Vegetarisch</p>
+                  <InfoHint text="Bitte aktivieren, wenn vegetarische Portionen gebraucht werden." />
+                </div>
                 <p className="text-xs text-slate-500">
                   Bitte auswählen, falls vegetarische Portionen benötigt werden.
                 </p>
@@ -275,8 +337,9 @@ export function ReservationForm({
             </label>
             {vegetarianSelected && (
               <div className="mt-3">
-                <label className="block text-sm font-medium text-slate-600">
-                  Anzahl vegetarischer Portionen*
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  Anzahl vegetarischer Portionen*{' '}
+                  <InfoHint text="Wie viele vegetarische Teller benötigt werden." />
                 </label>
                 <input
                   type="number"
@@ -299,7 +362,10 @@ export function ReservationForm({
                 className="mt-1 h-4 w-4 rounded border-slate-400"
               />
               <div className="flex-1">
-                <p className="font-medium">Vegan</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">Vegan</p>
+                  <InfoHint text="Bitte aktivieren, wenn vegane Portionen gebraucht werden." />
+                </div>
                 <p className="text-xs text-slate-500">
                   Bitte auswählen, falls vegane Portionen benötigt werden.
                 </p>
@@ -307,8 +373,9 @@ export function ReservationForm({
             </label>
             {veganSelected && (
               <div className="mt-3">
-                <label className="block text-sm font-medium text-slate-600">
-                  Anzahl veganer Portionen*
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  Anzahl veganer Portionen*{' '}
+                  <InfoHint text="Wie viele vegane Teller benötigt werden." />
                 </label>
                 <input
                   type="number"
@@ -327,7 +394,9 @@ export function ReservationForm({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Zahlungsart*</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Zahlungsart* <InfoHint text="Gewünschte Zahlungsweise vor Ort oder per Rechnung." />
+          </label>
           <select {...register('paymentMethod')} className="mt-1 w-full rounded border px-3 py-2">
             <option value="">Bitte wählen</option>
             <option value="Rechnung">Rechnung</option>
@@ -338,8 +407,9 @@ export function ReservationForm({
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">
-            Bemerkungen / Unverträglichkeiten
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Bemerkungen / Unverträglichkeiten{' '}
+            <InfoHint text="Allergien, Raumwünsche oder Hinweise an das Team." />
           </label>
           <textarea
             {...register('notes')}
@@ -352,7 +422,10 @@ export function ReservationForm({
       <section className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
         <div>
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="text-lg font-semibold text-brand">Extras auswählen</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-brand">Extras auswählen</h3>
+              <InfoHint text="Mehrfachauswahl möglich; Preise werden automatisch berechnet." />
+            </div>
             <p className="text-xs text-slate-500">
               Grundpreis pro Person: {formatCurrency(pricing.pricePerGuest)}
             </p>
@@ -450,7 +523,10 @@ export function ReservationForm({
       <input type="hidden" {...register('totalPrice', { valueAsNumber: true })} />
 
       <section>
-        <label className="block text-sm font-medium text-slate-600">DSGVO & Einwilligung*</label>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+          DSGVO & Einwilligung*{' '}
+          <InfoHint text="Erforderlich, damit wir Ihre Angaben für die Reservierung verarbeiten dürfen." />
+        </label>
         <div className="mt-2 flex items-start gap-3 rounded border border-slate-200 bg-slate-50 p-3">
           <input
             type="checkbox"
@@ -468,8 +544,9 @@ export function ReservationForm({
       </section>
 
       <section>
-        <label className="block text-sm font-medium text-slate-600">
-          Reservierungsbedingungen*
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+          Reservierungsbedingungen*{' '}
+          <InfoHint text="Bitte durchlesen und bestätigen, damit wir die Anfrage annehmen können." />
         </label>
         <div className="mt-2 space-y-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
           <div className="flex items-center gap-2">
@@ -502,7 +579,10 @@ export function ReservationForm({
       </section>
 
       <section>
-        <label className="block text-sm font-medium text-slate-600">Digitale Unterschrift*</label>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+          Digitale Unterschrift*{' '}
+          <InfoHint text="Bitte mit Maus oder Finger unterschreiben, um die Anfrage zu bestätigen." />
+        </label>
         <SignaturePad
           onChange={(value) => {
             setValue('signature', value, { shouldValidate: true, shouldDirty: true });

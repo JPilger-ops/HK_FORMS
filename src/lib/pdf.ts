@@ -40,6 +40,7 @@ async function buildHtml(
     reservation.guestName ||
     (legacy.guestName as string) ||
     '';
+  const hostCompany = reservation.hostCompany ?? (legacy.hostCompany as string) ?? '';
   const hostEmail =
     reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
   const hostPhone =
@@ -119,6 +120,7 @@ async function buildHtml(
       <h2>Gastgeber</h2>
       <table>
         <tr><th>Name</th><td>${hostName}</td></tr>
+        <tr><th>Firma</th><td>${hostCompany || '-'}</td></tr>
         <tr><th>Straße + Nr.</th><td>${hostStreet}</td></tr>
         <tr><th>PLZ / Ort</th><td>${hostPostalAndCity}</td></tr>
         <tr><th>Telefon</th><td>${hostPhone}</td></tr>

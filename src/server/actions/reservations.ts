@@ -125,6 +125,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
         data: {
           hostFirstName: data.hostFirstName,
           hostLastName: data.hostLastName,
+          hostCompany: data.hostCompany ?? null,
           hostStreet: data.hostStreet,
           hostPostalCode: data.hostPostalCode,
           hostCity: data.hostCity,
@@ -222,6 +223,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   if (notificationSettings.enabled && notificationSettings.recipients.length > 0) {
     const vars = {
       guestName: reservationWithSignatures.guestName,
+      guestCompany: reservationWithSignatures.hostCompany ?? '',
       guestEmail: reservationWithSignatures.guestEmail ?? '',
       guestPhone: reservationWithSignatures.guestPhone ?? '',
       guestAddress: reservationWithSignatures.guestAddress ?? '',
@@ -276,6 +278,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   const template = await getEmailTemplateSettings();
   const vars = {
     guestName: reservationWithSignatures.guestName,
+    guestCompany: reservationWithSignatures.hostCompany ?? '',
     eventDate: eventDateLabel,
     eventStart: reservationWithSignatures.eventStartTime,
     eventEnd: reservationWithSignatures.eventEndTime,

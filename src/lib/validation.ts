@@ -14,6 +14,17 @@ function positiveCountField(message: string) {
   );
 }
 
+function optionalTrimmedString(maxLength: number, message: string) {
+  return z.preprocess(
+    (value) => {
+      if (typeof value !== 'string') return undefined;
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : undefined;
+    },
+    z.string().max(maxLength, message).optional()
+  );
+}
+
 function timeToMinutes(value: string | null | undefined) {
   if (!value) return null;
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
@@ -33,6 +44,7 @@ function isAfterMinStart(value: string | null | undefined) {
 export const reservationSchema = z.object({
   hostFirstName: z.string().min(2, 'Vorname erforderlich'),
   hostLastName: z.string().min(2, 'Nachname erforderlich'),
+  hostCompany: optionalTrimmedString(120, 'Firmenname darf maximal 120 Zeichen lang sein'),
   hostStreet: z.string().min(3, 'Straße und Hausnummer erforderlich'),
   hostPostalCode: z.string().min(4, 'PLZ erforderlich'),
   hostCity: z.string().min(2, 'Ort erforderlich'),

@@ -81,6 +81,7 @@ export function reservationToIcs({
 
   const noteVariables = {
     guestName: reservation.guestName,
+    guestCompany: reservation.hostCompany ?? '',
     guestEmail: reservation.guestEmail ?? '',
     guestPhone: reservation.guestPhone ?? '',
     guestAddress: reservation.guestAddress ?? '',

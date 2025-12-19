@@ -71,6 +71,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     reservation.guestName ||
     (legacy.guestName as string) ||
     '';
+  const hostCompany = reservation.hostCompany ?? (legacy.hostCompany as string) ?? '';
   const hostEmail =
     reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
   const hostPhone =
@@ -119,6 +120,12 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               <dt className="text-slate-500">Gastgeber</dt>
               <dd className="font-medium">{hostFullName}</dd>
             </div>
+            {hostCompany && (
+              <div>
+                <dt className="text-slate-500">Firma</dt>
+                <dd>{hostCompany}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-slate-500">E-Mail</dt>
               <dd>{hostEmail}</dd>

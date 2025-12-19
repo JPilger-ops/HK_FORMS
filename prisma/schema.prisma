@@ -46,6 +46,7 @@ model ReservationRequest {
   status              ReservationStatus @default(NEW)
   hostFirstName       String?
   hostLastName        String?
+  hostCompany         String?
   hostStreet          String?
   hostPostalCode      String?
   hostCity            String?
