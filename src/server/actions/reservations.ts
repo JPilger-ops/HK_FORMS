@@ -280,8 +280,16 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     eventStart: reservationWithSignatures.eventStartTime,
     eventEnd: reservationWithSignatures.eventEndTime,
     reservationId: reservationWithSignatures.id,
-    dietaryNotes: dietaryNotes || '',
-    notes: combinedNotes || ''
+    dietaryNotes: dietaryNotes || 'Keine Angaben',
+    vegetarianGuests:
+      typeof reservationWithSignatures.vegetarianGuests === 'number'
+        ? reservationWithSignatures.vegetarianGuests.toString()
+        : '',
+    veganGuests:
+      typeof reservationWithSignatures.veganGuests === 'number'
+        ? reservationWithSignatures.veganGuests.toString()
+        : '',
+    notes: combinedNotes || 'Keine Angaben'
   };
   const subject = renderTemplate(template.subject, vars);
   const bodyHtml = toHtmlParagraphs(renderTemplate(template.body, vars));

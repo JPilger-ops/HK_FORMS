@@ -72,8 +72,8 @@ export function reservationToIcs({
   const now = formatDateTimeLocal(new Date());
   const eventDateLabel = new Intl.DateTimeFormat('de-DE').format(reservation.eventDate);
   const summary = `${summaryPrefix} ${reservation.guestName}`;
-  const dietaryNotes = buildDietaryNotes(reservation);
-  const combinedNotes = buildCombinedNotes(reservation);
+  const dietaryNotes = buildDietaryNotes(reservation) || 'Keine Angaben';
+  const combinedNotes = buildCombinedNotes(reservation) || 'Keine Angaben';
   const formattedPrice =
     typeof pricePerGuest === 'number'
       ? pricePerGuest.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

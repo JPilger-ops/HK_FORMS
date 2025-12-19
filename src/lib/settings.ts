@@ -223,7 +223,9 @@ export const emailTemplateDefaults = {
     'Bei Rückfragen antworten Sie gern auf diese E-Mail.',
     '',
     'Freundliche Grüße',
-    'Ihr Team der Waldwirtschaft Heidekönig'
+    'Ihr Team der Waldwirtschaft Heidekönig',
+    '',
+    'Veggie/Vegan: {{dietaryNotes}}'
   ].join('\n')
 };
 
@@ -268,6 +270,7 @@ export const icsTemplateDefaults = {
     'Start Essen: {{startMeal}}',
     'Preis p. P.: {{pricePerGuest}}',
     'Extras: {{extrasList}}',
+    'Veggie/Vegan: {{dietaryNotes}}',
     'Bemerkungen: {{notes}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
@@ -292,6 +295,7 @@ export const notificationTemplateDefaults = {
     'Extras:',
     '{{extrasList}}',
     'Bemerkungen: {{notes}}',
+    'Veggie/Vegan: {{dietaryNotes}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
 };
