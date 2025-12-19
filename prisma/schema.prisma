@@ -94,6 +94,7 @@ model ReservationRequest {
   invoiceSentAt       DateTime?
   invoicePaidAt       DateTime?
   invoiceOverdueSince DateTime?
+  invoices            ReservationInvoice[]
 }
 
 model ExtraOption {
@@ -117,6 +118,21 @@ model Signature {
   createdAt     DateTime           @default(now())
 
   @@unique([reservationId, type])
+}
+
+model ReservationInvoice {
+  id               String             @id @default(uuid())
+  reservationId    String
+  reservation      ReservationRequest @relation(fields: [reservationId], references: [id])
+  invoiceReference String
+  firstItemLabel   String
+  status           InvoiceStatus      @default(NONE)
+  sentAt           DateTime?
+  paidAt           DateTime?
+  overdueSince     DateTime?
+  createdAt        DateTime           @default(now())
+
+  @@unique([reservationId, invoiceReference])
 }
 
 model EmailLog {

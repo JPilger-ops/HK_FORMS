@@ -27,7 +27,12 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   await assertPermission('view:requests');
   const reservation = await prisma.reservationRequest.findUnique({
     where: { id: params.id },
-    include: { signatures: true, emails: true, auditLogs: { orderBy: { createdAt: 'desc' } } }
+    include: {
+      signatures: true,
+      emails: true,
+      auditLogs: { orderBy: { createdAt: 'desc' } },
+      invoices: { orderBy: { createdAt: 'asc' } }
+    }
   });
   if (!reservation) {
     notFound();
@@ -98,7 +103,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     .join(' | ');
   const formatDate = (value?: Date | null) =>
     value ? new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(value) : null;
-  const invoiceStatus = reservation.invoiceStatus ?? 'NONE';
+  const invoices = reservation.invoices ?? [];
   const invoiceBadge: Record<string, string> = {
     NONE: 'bg-slate-100 text-slate-700 border-slate-200',
     SENT: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -111,8 +116,8 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     PAID: 'Bezahlt',
     OVERDUE: 'Überfällig'
   };
-  const invoiceReference = reservation.invoiceReference ?? '';
-  const isUrl = invoiceReference.startsWith('http://') || invoiceReference.startsWith('https://');
+  const isUrl = (value?: string | null) =>
+    typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'));
 
   return (
     <AdminShell>
@@ -246,50 +251,56 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
 
           <div className="mt-4 rounded border border-slate-200 p-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Rechnung</p>
-              <span
-                className={`rounded-full border px-2 py-1 text-xs font-semibold ${invoiceBadge[invoiceStatus] ?? invoiceBadge.NONE}`}
-              >
-                {invoiceLabels[invoiceStatus] ?? invoiceStatus}
-              </span>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Rechnungen</p>
             </div>
-            {invoiceStatus === 'NONE' &&
-            !invoiceReference &&
-            !reservation.invoiceSentAt &&
-            !reservation.invoicePaidAt &&
-            !reservation.invoiceOverdueSince ? (
-              <p className="mt-2 text-sm text-slate-600">Keine Rechnungsdaten vorhanden.</p>
+            {invoices.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-600">Keine Rechnungen vorhanden.</p>
             ) : (
-              <dl className="mt-3 space-y-2 text-sm text-slate-700">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Referenz</dt>
-                  <dd className="text-right">
-                    {invoiceReference ? (
-                      isUrl ? (
-                        <a href={invoiceReference} className="text-brand underline" target="_blank" rel="noreferrer">
-                          Im CRM öffnen
-                        </a>
-                      ) : (
-                        invoiceReference
-                      )
-                    ) : (
-                      <span className="text-slate-500">Keine Angabe</span>
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Versendet am</dt>
-                  <dd>{formatDate(reservation.invoiceSentAt) ?? '–'}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Bezahlt am</dt>
-                  <dd>{formatDate(reservation.invoicePaidAt) ?? '–'}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Überfällig seit</dt>
-                  <dd>{formatDate(reservation.invoiceOverdueSince) ?? '–'}</dd>
-                </div>
-              </dl>
+              <div className="mt-3 space-y-3">
+                {invoices.map((invoice) => (
+                  <div key={invoice.id} className="rounded border border-slate-200 p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {isUrl(invoice.invoiceReference) ? (
+                          <a
+                            href={invoice.invoiceReference}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-semibold text-brand underline"
+                          >
+                            {invoice.invoiceReference}
+                          </a>
+                        ) : (
+                          <p className="text-sm font-semibold text-slate-800">{invoice.invoiceReference}</p>
+                        )}
+                        <span
+                          className={`rounded-full border px-2 py-1 text-xs font-semibold ${invoiceBadge[invoice.status] ?? invoiceBadge.NONE}`}
+                        >
+                          {invoiceLabels[invoice.status] ?? invoice.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Erstellt: {formatDate(invoice.createdAt) ?? '–'}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-700">{invoice.firstItemLabel}</p>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-3">
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Versendet am</dt>
+                        <dd>{formatDate(invoice.sentAt) ?? '–'}</dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Bezahlt am</dt>
+                        <dd>{formatDate(invoice.paidAt) ?? '–'}</dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Überfällig seit</dt>
+                        <dd>{formatDate(invoice.overdueSince) ?? '–'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
