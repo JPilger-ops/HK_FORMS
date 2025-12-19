@@ -52,6 +52,23 @@ function formatHostAddress(data: {
   return parts.join(', ');
 }
 
+function buildDietaryNotes(input: { vegetarianGuests?: number | null; veganGuests?: number | null }) {
+  return [
+    typeof input.vegetarianGuests === 'number'
+      ? `${input.vegetarianGuests}× vegetarisch`
+      : null,
+    typeof input.veganGuests === 'number' ? `${input.veganGuests}× vegan` : null
+  ]
+    .filter(Boolean)
+    .join(' | ');
+}
+
+function combineNotes(notes?: string | null, dietaryNotes?: string) {
+  const trimmedNotes = typeof notes === 'string' && notes.trim().length > 0 ? notes.trim() : null;
+  const trimmedDietary = dietaryNotes && dietaryNotes.trim().length > 0 ? dietaryNotes.trim() : null;
+  return [trimmedNotes, trimmedDietary].filter(Boolean).join(' | ');
+}
+
 async function getExtrasForSelection(ids: string[]): Promise<ExtraOptionInput[]> {
   if (!ids.length) return [];
   const extras = await prisma.extraOption.findMany({
@@ -123,6 +140,8 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
           eventEndTime: ENFORCED_END_TIME,
           startMeal: data.startMeal,
           numberOfGuests: data.numberOfGuests,
+          vegetarianGuests: data.vegetarian ? data.vegetarianCount ?? null : null,
+          veganGuests: data.vegan ? data.veganCount ?? null : null,
           paymentMethod: data.paymentMethod,
           extrasSelection: validExtras.length ? JSON.stringify(validExtras) : null,
           extrasSnapshot: extrasSnapshot.length
@@ -177,6 +196,8 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     reservationWithSignatures.eventDate
   );
   const extrasForEmail = parseExtrasSnapshot(reservationWithSignatures.extrasSnapshot);
+  const dietaryNotes = buildDietaryNotes(reservationWithSignatures);
+  const combinedNotes = combineNotes(reservationWithSignatures.extras, dietaryNotes);
   const icsTemplate = await getIcsTemplateSettings();
   const ics = reservationToIcs({
     reservation: reservationWithSignatures,
@@ -213,7 +234,16 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
       pricePerGuest: euro.format(pricing.pricePerGuest),
       totalPrice: euro.format(pricing.total),
       extrasList: extrasListEmail,
-      notes: reservationWithSignatures.extras ?? 'Keine Angaben',
+      notes: combinedNotes || 'Keine Angaben',
+      dietaryNotes: dietaryNotes || 'Keine Angaben',
+      vegetarianGuests:
+        typeof reservationWithSignatures.vegetarianGuests === 'number'
+          ? reservationWithSignatures.vegetarianGuests.toString()
+          : '',
+      veganGuests:
+        typeof reservationWithSignatures.veganGuests === 'number'
+          ? reservationWithSignatures.veganGuests.toString()
+          : '',
       reservationId: reservationWithSignatures.id
     };
 
@@ -249,7 +279,9 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
     eventDate: eventDateLabel,
     eventStart: reservationWithSignatures.eventStartTime,
     eventEnd: reservationWithSignatures.eventEndTime,
-    reservationId: reservationWithSignatures.id
+    reservationId: reservationWithSignatures.id,
+    dietaryNotes: dietaryNotes || '',
+    notes: combinedNotes || ''
   };
   const subject = renderTemplate(template.subject, vars);
   const bodyHtml = toHtmlParagraphs(renderTemplate(template.body, vars));

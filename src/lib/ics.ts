@@ -33,6 +33,26 @@ function formatExtras(extras: ExtraSnapshot[]) {
     .join('; ');
 }
 
+function buildDietaryNotes(reservation: ReservationRequest) {
+  return [
+    typeof reservation.vegetarianGuests === 'number'
+      ? `${reservation.vegetarianGuests}× vegetarisch`
+      : null,
+    typeof reservation.veganGuests === 'number' ? `${reservation.veganGuests}× vegan` : null
+  ]
+    .filter(Boolean)
+    .join(' | ');
+}
+
+function buildCombinedNotes(reservation: ReservationRequest) {
+  const dietaryNotes = buildDietaryNotes(reservation);
+  const baseNotes =
+    typeof reservation.extras === 'string' && reservation.extras.trim().length > 0
+      ? reservation.extras.trim()
+      : '';
+  return [baseNotes || null, dietaryNotes || null].filter(Boolean).join(' | ');
+}
+
 export function reservationToIcs({
   reservation,
   extras,
@@ -52,6 +72,8 @@ export function reservationToIcs({
   const now = formatDateTimeLocal(new Date());
   const eventDateLabel = new Intl.DateTimeFormat('de-DE').format(reservation.eventDate);
   const summary = `${summaryPrefix} ${reservation.guestName}`;
+  const dietaryNotes = buildDietaryNotes(reservation);
+  const combinedNotes = buildCombinedNotes(reservation);
   const formattedPrice =
     typeof pricePerGuest === 'number'
       ? pricePerGuest.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -70,7 +92,11 @@ export function reservationToIcs({
     paymentMethod: reservation.paymentMethod,
     pricePerGuest: formattedPrice ? `${formattedPrice} €` : '',
     extrasList: formatExtras(extrasList),
-    notes: reservation.extras ?? '',
+    notes: combinedNotes,
+    dietaryNotes,
+    vegetarianGuests:
+      typeof reservation.vegetarianGuests === 'number' ? String(reservation.vegetarianGuests) : '',
+    veganGuests: typeof reservation.veganGuests === 'number' ? String(reservation.veganGuests) : '',
     reservationId: reservation.id
   };
 

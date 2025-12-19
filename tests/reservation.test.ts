@@ -22,6 +22,8 @@ const mockReservation = {
   eventEndTime: '23:00',
   startMeal: '19:00',
   numberOfGuests: 10,
+  vegetarianGuests: null,
+  veganGuests: null,
   paymentMethod: 'Rechnung',
   extrasSelection: '[]',
   extrasSnapshot: [],
@@ -218,6 +220,37 @@ describe('createReservationAction', () => {
     );
     expect(result.success).toBe(false);
     expect(result.error).toBe('TOKEN_INVALID');
+  });
+
+  it('requires counts when vegan/vegetarisch selected', async () => {
+    const result = await createReservationAction(
+      {
+        hostFirstName: 'Test',
+        hostLastName: 'Gast',
+        hostStreet: 'Teststraße 1',
+        hostPostalCode: '12345',
+        hostCity: 'Musterstadt',
+        hostPhone: '01234',
+        hostEmail: 'gast@example.com',
+        eventDate: '2024-12-24',
+        eventType: 'Feier',
+        eventStartTime: '18:00',
+        eventEndTime: '20:00',
+        startMeal: '19:00',
+        numberOfGuests: 10,
+        paymentMethod: 'Rechnung',
+        selectedExtras: [],
+        notes: '',
+        vegetarian: true,
+        vegan: true,
+        privacyAccepted: true,
+        termsAccepted: true,
+        signature: 'data:image/png;base64,ZmFrZQ=='
+      },
+      { inviteToken: 'token-abc' }
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('VALIDATION_ERROR');
   });
 
   it('rejects unsupported payment methods', async () => {

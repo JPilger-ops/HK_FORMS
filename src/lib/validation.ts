@@ -3,6 +3,17 @@ import { z } from 'zod';
 const phoneRegex = /^[0-9+()\/\s-]{5,}$/;
 const MIN_START_MINUTES = 17 * 60;
 
+function positiveCountField(message: string) {
+  return z.preprocess(
+    (value) => {
+      if (value === '' || value === null || value === undefined) return undefined;
+      if (typeof value === 'number' && Number.isNaN(value)) return undefined;
+      return value;
+    },
+    z.coerce.number().int().min(1, message).optional()
+  );
+}
+
 function timeToMinutes(value: string | null | undefined) {
   if (!value) return null;
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
@@ -42,6 +53,10 @@ export const reservationSchema = z.object({
     .min(1, 'Bitte Startessen angeben')
     .refine(isAfterMinStart, 'Start Essen frühestens 17:00 Uhr'),
   numberOfGuests: z.coerce.number().min(1, 'Personenzahl erforderlich'),
+  vegetarian: z.boolean().default(false),
+  vegetarianCount: positiveCountField('Anzahl vegetarischer Portionen erforderlich'),
+  vegan: z.boolean().default(false),
+  veganCount: positiveCountField('Anzahl veganer Portionen erforderlich'),
   paymentMethod: z.enum(['Rechnung', 'Barzahlung'], {
     required_error: 'Zahlungsart erforderlich'
   }),
@@ -56,6 +71,21 @@ export const reservationSchema = z.object({
     .boolean()
     .refine((value) => value === true, 'Bitte bestätigen Sie die Reservierungsbedingungen.'),
   signature: z.string().min(10)
+}).superRefine((data, ctx) => {
+  if (data.vegetarian && !data.vegetarianCount) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Anzahl vegetarischer Portionen erforderlich',
+      path: ['vegetarianCount']
+    });
+  }
+  if (data.vegan && !data.veganCount) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Anzahl veganer Portionen erforderlich',
+      path: ['veganCount']
+    });
+  }
 });
 
 export type ReservationInput = z.infer<typeof reservationSchema>;

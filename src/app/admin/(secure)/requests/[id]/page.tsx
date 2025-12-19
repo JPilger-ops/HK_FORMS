@@ -37,6 +37,8 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   const formatMoney = (value?: any) =>
     value || value === 0 ? euro.format(Number(value ?? 0)) : '-';
+  const formatPortions = (value?: number | null) =>
+    typeof value === 'number' ? `${value} Portionen` : 'Keine Angabe';
   const extrasSnapshot = parseExtrasSnapshot(reservation.extrasSnapshot);
   const selectedFromLegacy = parseSelectedExtraIds(reservation.extrasSelection);
   const selectedExtras = extrasSnapshot.length
@@ -81,6 +83,17 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     hostAddressParts.length > 0
       ? hostAddressParts.join(', ')
       : (reservation.guestAddress ?? (legacy.guestAddress as string) ?? '-');
+  const dietaryNotes = [
+    typeof reservation.vegetarianGuests === 'number'
+      ? `${reservation.vegetarianGuests}× vegetarisch`
+      : null,
+    typeof reservation.veganGuests === 'number' ? `${reservation.veganGuests}× vegan` : null
+  ]
+    .filter(Boolean)
+    .join(' | ');
+  const combinedNotes = [reservation.extras?.trim() ? reservation.extras.trim() : null, dietaryNotes || null]
+    .filter(Boolean)
+    .join(' | ');
 
   return (
     <AdminShell>
@@ -141,6 +154,14 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               <dd>{reservation.numberOfGuests}</dd>
             </div>
             <div>
+              <dt className="text-slate-500">Vegetarisch</dt>
+              <dd>{formatPortions(reservation.vegetarianGuests)}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Vegan</dt>
+              <dd>{formatPortions(reservation.veganGuests)}</dd>
+            </div>
+            <div>
               <dt className="text-slate-500">Zahlungsart</dt>
               <dd>{reservation.paymentMethod}</dd>
             </div>
@@ -186,11 +207,9 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
                 Extras wurden übernommen, Details liegen nur als Summe vor.
               </p>
             )}
-            {reservation.extras && (
-              <p className="mt-3 text-sm text-slate-600">
-                Bemerkungen / Unverträglichkeiten: {reservation.extras}
-              </p>
-            )}
+            <p className="mt-3 text-sm text-slate-600">
+              Bemerkungen / Unverträglichkeiten: {combinedNotes || 'Keine Angaben'}
+            </p>
           </div>
 
           {(reservation.internalResponsible || reservation.internalNotes) && (

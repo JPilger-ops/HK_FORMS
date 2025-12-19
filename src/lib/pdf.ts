@@ -76,6 +76,25 @@ async function buildHtml(
           )
           .join('')}</ul>`
       : '<em>Keine</em>';
+  const vegetarianLabel =
+    typeof reservation.vegetarianGuests === 'number'
+      ? `${reservation.vegetarianGuests} Portionen`
+      : '-';
+  const veganLabel =
+    typeof reservation.veganGuests === 'number' ? `${reservation.veganGuests} Portionen` : '-';
+  const dietaryNotes = [reservation.vegetarianGuests, reservation.veganGuests]
+    .map((count, index) =>
+      typeof count === 'number'
+        ? `${count}× ${index === 0 ? 'vegetarisch' : 'vegan'}`
+        : null
+    )
+    .filter(Boolean)
+    .join(' | ');
+  const notesParts = [
+    reservation.extras && reservation.extras.trim().length ? reservation.extras.trim() : null,
+    dietaryNotes || null
+  ].filter(Boolean);
+  const combinedNotes = notesParts.join(' | ') || '-';
 
   return `<!DOCTYPE html>
   <html>
@@ -115,6 +134,8 @@ async function buildHtml(
         <tr><th>Zeiten</th><td>${reservation.eventStartTime} - ${reservation.eventEndTime ?? '22:30'}</td></tr>
         <tr><th>Start Essen</th><td>${reservation.startMeal ?? '-'}</td></tr>
         <tr><th>Personenzahl</th><td>${reservation.numberOfGuests}</td></tr>
+        <tr><th>Vegetarisch</th><td>${vegetarianLabel}</td></tr>
+        <tr><th>Vegan</th><td>${veganLabel}</td></tr>
       </table>
     </div>
 
@@ -127,7 +148,7 @@ async function buildHtml(
         <tr><th>Grundpreis</th><td>${price(basePrice)}</td></tr>
         <tr><th>Extras Summe</th><td>${price(extrasTotal)}</td></tr>
         <tr><th>Total</th><td>${price(totalPrice)}</td></tr>
-        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${reservation.extras ?? '-'}</td></tr>
+        <tr><th>Bemerkungen / Unverträglichkeiten</th><td style="min-height:80px;">${combinedNotes}</td></tr>
       </table>
     </div>
 

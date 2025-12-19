@@ -54,11 +54,19 @@ export function ReservationForm({
       totalPrice: 0,
       privacyAccepted: false,
       termsAccepted: false,
-      notes: ''
+      notes: '',
+      vegetarian: false,
+      vegan: false,
+      vegetarianCount: undefined,
+      veganCount: undefined
     }
   });
 
   const guests = watch('numberOfGuests') ?? 0;
+  const vegetarianSelected = watch('vegetarian');
+  const veganSelected = watch('vegan');
+  const vegetarianCount = watch('vegetarianCount');
+  const veganCount = watch('veganCount');
   const rawSelectedExtras = watch('selectedExtras');
   const selectedExtras = useMemo(() => {
     const value = rawSelectedExtras ?? [];
@@ -80,6 +88,18 @@ export function ReservationForm({
     setValue('totalPrice', pricing.total, { shouldValidate: true, shouldDirty: true });
     setValue('eventEndTime', enforcedEndTime, { shouldValidate: true, shouldDirty: true });
   }, [pricing.base, pricing.total, enforcedEndTime, setValue]);
+
+  useEffect(() => {
+    if (!vegetarianSelected && vegetarianCount !== undefined) {
+      setValue('vegetarianCount', undefined, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [setValue, vegetarianSelected, vegetarianCount]);
+
+  useEffect(() => {
+    if (!veganSelected && veganCount !== undefined) {
+      setValue('veganCount', undefined, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [setValue, veganSelected, veganCount]);
 
   const onSubmit = (values: ReservationInput) => {
     startTransition(async () => {
@@ -230,6 +250,78 @@ export function ReservationForm({
           {errors.numberOfGuests && (
             <p className="text-sm text-red-600">{errors.numberOfGuests.message}</p>
           )}
+        </div>
+      </section>
+
+      <section className="rounded border border-slate-200 bg-slate-50 p-4 shadow-inner">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-brand">Vegan / Vegetarisch</h3>
+          <p className="text-xs text-slate-500">Optional, ohne Preisänderung</p>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded border border-slate-200 bg-white p-3 shadow-sm">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                {...register('vegetarian')}
+                className="mt-1 h-4 w-4 rounded border-slate-400"
+              />
+              <div className="flex-1">
+                <p className="font-medium">Vegetarisch</p>
+                <p className="text-xs text-slate-500">
+                  Bitte auswählen, falls vegetarische Portionen benötigt werden.
+                </p>
+              </div>
+            </label>
+            {vegetarianSelected && (
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-slate-600">
+                  Anzahl vegetarischer Portionen*
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  {...register('vegetarianCount', { valueAsNumber: true })}
+                  className="mt-1 w-full rounded border px-3 py-2"
+                />
+                {errors.vegetarianCount && (
+                  <p className="text-sm text-red-600">{errors.vegetarianCount.message}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded border border-slate-200 bg-white p-3 shadow-sm">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                {...register('vegan')}
+                className="mt-1 h-4 w-4 rounded border-slate-400"
+              />
+              <div className="flex-1">
+                <p className="font-medium">Vegan</p>
+                <p className="text-xs text-slate-500">
+                  Bitte auswählen, falls vegane Portionen benötigt werden.
+                </p>
+              </div>
+            </label>
+            {veganSelected && (
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-slate-600">
+                  Anzahl veganer Portionen*
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  {...register('veganCount', { valueAsNumber: true })}
+                  className="mt-1 w-full rounded border px-3 py-2"
+                />
+                {errors.veganCount && (
+                  <p className="text-sm text-red-600">{errors.veganCount.message}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
