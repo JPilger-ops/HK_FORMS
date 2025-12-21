@@ -82,7 +82,7 @@ export default async function NotificationSettingsPage() {
           <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
             <p className="font-semibold text-slate-800">Platzhalter</p>
             <p className="mt-1">
-              {'{{guestName}}, {{guestEmail}}, {{guestPhone}}, {{guestAddress}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{guests}}, {{startMeal}}, {{paymentMethod}}, {{pricePerGuest}}, {{totalPrice}}, {{extrasList}}, {{notes}}, {{reservationId}}'}
+              {'{{guestName}}, {{guestCompany}}, {{guestEmail}}, {{guestPhone}}, {{guestAddress}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{guests}}, {{startMeal}}, {{paymentMethod}}, {{pricePerGuest}}, {{totalPrice}}, {{extrasList}}, {{notes}}, {{dietaryNotes}}, {{vegetarianGuests}}, {{veganGuests}}, {{reservationId}}'}
             </p>
           </div>
 

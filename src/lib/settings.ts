@@ -267,6 +267,7 @@ export const emailTemplateDefaults = {
   subject: 'Ihre Anfrage bei der Waldwirtschaft Heidekönig',
   body: [
     'Hallo {{guestName}},',
+    'Firma: {{guestCompany}}',
     '',
     'vielen Dank für Ihre Reservierungsanfrage am {{eventDate}} ({{eventStart}} - {{eventEnd}}).',
     'Wir prüfen die Verfügbarkeit und melden uns zeitnah mit einem Angebot.',
@@ -277,7 +278,9 @@ export const emailTemplateDefaults = {
     'Freundliche Grüße',
     'Ihr Team der Waldwirtschaft Heidekönig',
     '',
-    'Veggie/Vegan: {{dietaryNotes}}'
+    'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}'
   ].join('\n')
 };
 
@@ -314,6 +317,7 @@ export async function getInviteTemplateSettings() {
 export const icsTemplateDefaults = {
   notes: [
     'Gast: {{guestName}} ({{guestEmail}})',
+    'Firma: {{guestCompany}}',
     'Telefon: {{guestPhone}}',
     'Adresse: {{guestAddress}}',
     'Datum: {{eventDate}} {{eventStart}} - {{eventEnd}}',
@@ -323,6 +327,8 @@ export const icsTemplateDefaults = {
     'Preis p. P.: {{pricePerGuest}}',
     'Extras: {{extrasList}}',
     'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}',
     'Bemerkungen: {{notes}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
@@ -340,6 +346,7 @@ export const notificationTemplateDefaults = {
   body: [
     'Es liegt eine neue Reservierungsanfrage vor.',
     'Gast: {{guestName}} ({{guestEmail}})',
+    'Firma: {{guestCompany}}',
     'Kontakt: {{guestPhone}} · {{guestAddress}}',
     'Datum: {{eventDate}} ({{eventStart}} - {{eventEnd}})',
     'Personen: {{guests}} · Start Essen: {{startMeal}} · Zahlungsart: {{paymentMethod}}',
@@ -348,6 +355,8 @@ export const notificationTemplateDefaults = {
     '{{extrasList}}',
     'Bemerkungen: {{notes}}',
     'Veggie/Vegan: {{dietaryNotes}}',
+    'Vegetarisch: {{vegetarianGuests}}',
+    'Vegan: {{veganGuests}}',
     'Anfrage-ID: {{reservationId}}'
   ].join('\n')
 };
@@ -369,4 +378,28 @@ export async function getNotificationSettings() {
     subject: subject.trim() ? subject : defaults.subject,
     body: body.trim() ? body : defaults.body
   };
+}
+
+export type ReWebAppSettings = {
+  enabled: boolean;
+  baseUrl: string | null;
+  apiKey: string | null;
+  organizationId: string | null;
+};
+
+export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
+  const enabledSetting = parseOptionalBoolean(await getSetting('re_webapp_enabled'));
+  const enabledEnv = parseOptionalBoolean(process.env.RE_WEBAPP_ENABLED ?? null);
+  const enabled = enabledSetting ?? enabledEnv ?? false;
+  const baseUrl =
+    normalizeString(await getSetting('re_webapp_base_url')) ??
+    normalizeString(process.env.RE_WEBAPP_BASE_URL);
+  const apiKey =
+    normalizeString(await getSetting('re_webapp_api_key')) ??
+    normalizeString(process.env.RE_WEBAPP_API_KEY);
+  const organizationId =
+    normalizeString(await getSetting('re_webapp_org_id')) ??
+    normalizeString(process.env.RE_WEBAPP_ORG_ID);
+
+  return { enabled, baseUrl, apiKey, organizationId };
 }

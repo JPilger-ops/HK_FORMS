@@ -54,11 +54,17 @@ export default async function EmailSettingsPage() {
               Absender, Serverdaten und Vorlage für die Gastbestätigung anpassen.
             </p>
           </div>
-          <span className="text-xs text-slate-500">
-            {
-              'Gast: {{guestName}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{reservationId}} · Einladung: {{inviteLink}}, {{formKey}}, {{expiresAt}}'
-            }
-          </span>
+          <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <p className="font-semibold text-slate-800">Platzhalter</p>
+            <p className="mt-1">
+              {
+                'Gastbestätigung: {{guestName}}, {{guestCompany}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{reservationId}}, {{dietaryNotes}}, {{vegetarianGuests}}, {{veganGuests}}, {{notes}}'
+              }
+            </p>
+            <p className="mt-1">
+              {'Einladung: {{inviteLink}}, {{formKey}}, {{expiresAt}}'}
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
@@ -175,7 +181,9 @@ export default async function EmailSettingsPage() {
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
                 />
                 <p className="mt-1 text-xs text-slate-500">
-                  {'Absätze mit Leerzeile trennen. Platzhalter mit doppelten geschweiften Klammern einfügen, z. B. {{guestName}}.'}
+                  {
+                    'Absätze mit Leerzeile trennen. Verfügbare Platzhalter: {{guestName}}, {{guestCompany}}, {{eventDate}}, {{eventStart}}, {{eventEnd}}, {{reservationId}}, {{dietaryNotes}}, {{vegetarianGuests}}, {{veganGuests}}, {{notes}}.'
+                  }
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -215,7 +223,9 @@ export default async function EmailSettingsPage() {
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
                 />
                 <p className="mt-1 text-xs text-slate-500">
-                  {'Platzhalter: {{inviteLink}}, {{formKey}}, {{expiresAt}}. Der Button mit dem Link wird automatisch angehängt.'}
+                  {
+                    'Verfügbare Platzhalter: {{inviteLink}}, {{formKey}}, {{expiresAt}}. Der Button mit dem Link wird automatisch angehängt.'
+                  }
                 </p>
               </div>
               <button type="submit" className={`${primaryButtonClasses} px-6`}>

@@ -149,6 +149,33 @@ export async function updateIcsTemplateAction({ notes }: { notes: string }) {
   revalidatePath('/admin/settings/ics');
 }
 
+export async function updateReWebAppSettingsAction({
+  enabled,
+  baseUrl,
+  apiKey,
+  organizationId
+}: {
+  enabled: boolean;
+  baseUrl: string;
+  apiKey?: string;
+  organizationId?: string;
+}) {
+  await assertPermission('manage:settings');
+  const cleanBase = (baseUrl ?? '').trim().replace(/\/+$/, '');
+  const cleanOrg = (organizationId ?? '').trim();
+  const currentApiKey = (await getSetting('re_webapp_api_key')) ?? process.env.RE_WEBAPP_API_KEY ?? '';
+  const nextApiKey = apiKey?.trim() ? apiKey.trim() : currentApiKey;
+
+  await setSetting('re_webapp_enabled', enabled ? 'true' : 'false');
+  await setSetting('re_webapp_base_url', cleanBase);
+  await setSetting('re_webapp_org_id', cleanOrg);
+  if (nextApiKey) {
+    await setSetting('re_webapp_api_key', nextApiKey);
+  }
+
+  revalidatePath('/admin/settings/re-webapp');
+}
+
 export async function testSmtpSettingsAction() {
   await assertPermission('manage:settings');
   try {

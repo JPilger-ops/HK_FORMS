@@ -125,6 +125,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
         data: {
           hostFirstName: data.hostFirstName,
           hostLastName: data.hostLastName,
+          hostCompany: data.hostCompany ?? null,
           hostStreet: data.hostStreet,
           hostPostalCode: data.hostPostalCode,
           hostCity: data.hostCity,
@@ -222,6 +223,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   if (notificationSettings.enabled && notificationSettings.recipients.length > 0) {
     const vars = {
       guestName: reservationWithSignatures.guestName,
+      guestCompany: reservationWithSignatures.hostCompany ?? '',
       guestEmail: reservationWithSignatures.guestEmail ?? '',
       guestPhone: reservationWithSignatures.guestPhone ?? '',
       guestAddress: reservationWithSignatures.guestAddress ?? '',
@@ -276,6 +278,7 @@ export async function createReservationAction(input: unknown, opts?: { inviteTok
   const template = await getEmailTemplateSettings();
   const vars = {
     guestName: reservationWithSignatures.guestName,
+    guestCompany: reservationWithSignatures.hostCompany ?? '',
     eventDate: eventDateLabel,
     eventStart: reservationWithSignatures.eventStartTime,
     eventEnd: reservationWithSignatures.eventEndTime,
@@ -331,6 +334,19 @@ export async function updateReservationStatusAction(
   });
   await writeAuditLog({ reservationId, userId: session.user?.id, action: `STATUS:${status}` });
   return updated;
+}
+
+export async function updateInternalNotesAction(reservationId: string, formData: FormData) {
+  const session = await assertPermission('edit:requests');
+  const notes = (formData.get('internalNotes') as string) ?? '';
+  const trimmed = notes.trim();
+  await prisma.reservationRequest.update({
+    where: { id: reservationId },
+    data: { internalNotes: trimmed.length > 0 ? trimmed : null }
+  });
+  await writeAuditLog({ reservationId, userId: session.user?.id, action: 'NOTE:UPDATED' });
+  revalidatePath(`/admin/requests/${reservationId}`);
+  return { success: true };
 }
 
 export async function sendReservationEmailAction(reservationId: string, recipients: string[]) {

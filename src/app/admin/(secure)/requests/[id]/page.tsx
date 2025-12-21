@@ -8,6 +8,8 @@ import { assertPermission } from '@/lib/rbac';
 import { calculatePricing, parseExtrasSnapshot } from '@/lib/pricing';
 import { getPricePerGuestSetting } from '@/lib/settings';
 import { mapExtraToInput } from '@/server/extras';
+import { CopyToClipboard } from '@/components/admin/copy-to-clipboard';
+import { updateInternalNotesAction } from '@/server/actions/reservations';
 
 function parseSelectedExtraIds(value?: string | null) {
   if (!value) return [];
@@ -26,7 +28,12 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   await assertPermission('view:requests');
   const reservation = await prisma.reservationRequest.findUnique({
     where: { id: params.id },
-    include: { signatures: true, emails: true, auditLogs: { orderBy: { createdAt: 'desc' } } }
+    include: {
+      signatures: true,
+      emails: true,
+      auditLogs: { orderBy: { createdAt: 'desc' } },
+      invoices: { orderBy: { createdAt: 'asc' } }
+    }
   });
   if (!reservation) {
     notFound();
@@ -71,6 +78,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     reservation.guestName ||
     (legacy.guestName as string) ||
     '';
+  const hostCompany = reservation.hostCompany ?? (legacy.hostCompany as string) ?? '';
   const hostEmail =
     reservation.hostEmail ?? reservation.guestEmail ?? (legacy.guestEmail as string) ?? '-';
   const hostPhone =
@@ -94,6 +102,23 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
   const combinedNotes = [reservation.extras?.trim() ? reservation.extras.trim() : null, dietaryNotes || null]
     .filter(Boolean)
     .join(' | ');
+  const formatDate = (value?: Date | null) =>
+    value ? new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(value) : null;
+  const invoices = reservation.invoices ?? [];
+  const invoiceBadge: Record<string, string> = {
+    NONE: 'bg-slate-100 text-slate-700 border-slate-200',
+    SENT: 'bg-blue-100 text-blue-800 border-blue-200',
+    PAID: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    OVERDUE: 'bg-amber-100 text-amber-800 border-amber-200'
+  };
+  const invoiceLabels: Record<string, string> = {
+    NONE: 'Keine Rechnung hinterlegt',
+    SENT: 'Versendet',
+    PAID: 'Bezahlt',
+    OVERDUE: 'Überfällig'
+  };
+  const isUrl = (value?: string | null) =>
+    typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'));
 
   return (
     <AdminShell>
@@ -119,6 +144,19 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
               <dt className="text-slate-500">Gastgeber</dt>
               <dd className="font-medium">{hostFullName}</dd>
             </div>
+            <div>
+              <dt className="text-slate-500">Anfrage-ID</dt>
+              <dd className="flex items-center gap-2 font-mono text-xs text-slate-700">
+                <span>{reservation.id}</span>
+                <CopyToClipboard value={reservation.id} ariaLabel="Anfrage-ID kopieren" />
+              </dd>
+            </div>
+            {hostCompany && (
+              <div>
+                <dt className="text-slate-500">Firma</dt>
+                <dd>{hostCompany}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-slate-500">E-Mail</dt>
               <dd>{hostEmail}</dd>
@@ -212,17 +250,65 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             </p>
           </div>
 
-          {(reservation.internalResponsible || reservation.internalNotes) && (
+          <div className="mt-4 rounded border border-slate-200 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Rechnungen</p>
+            </div>
+            {invoices.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-600">Keine Rechnungen vorhanden.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {invoices.map((invoice) => (
+                  <div key={invoice.id} className="rounded border border-slate-200 p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {isUrl(invoice.invoiceReference) ? (
+                          <a
+                            href={invoice.invoiceReference}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-semibold text-brand underline"
+                          >
+                            {invoice.invoiceReference}
+                          </a>
+                        ) : (
+                          <p className="text-sm font-semibold text-slate-800">{invoice.invoiceReference}</p>
+                        )}
+                        <span
+                          className={`rounded-full border px-2 py-1 text-xs font-semibold ${invoiceBadge[invoice.status] ?? invoiceBadge.NONE}`}
+                        >
+                          {invoiceLabels[invoice.status] ?? invoice.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Erstellt: {formatDate(invoice.createdAt) ?? '–'}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-700">{invoice.firstItemLabel}</p>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-3">
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Versendet am</dt>
+                        <dd>{formatDate(invoice.sentAt) ?? '–'}</dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Bezahlt am</dt>
+                        <dd>{formatDate(invoice.paidAt) ?? '–'}</dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-slate-500">Überfällig seit</dt>
+                        <dd>{formatDate(invoice.overdueSince) ?? '–'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {reservation.internalResponsible && (
             <div className="rounded border border-slate-200 p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">Interne Felder</p>
-              {reservation.internalResponsible && (
-                <p className="text-sm text-slate-600">
-                  Zuständig: {reservation.internalResponsible}
-                </p>
-              )}
-              {reservation.internalNotes && (
-                <p className="text-sm text-slate-600">Notizen: {reservation.internalNotes}</p>
-              )}
+              <p className="text-sm text-slate-600">Zuständig: {reservation.internalResponsible}</p>
             </div>
           )}
 
@@ -278,6 +364,30 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
             reservationId={reservation.id}
             currentStatus={reservation.status}
           />
+
+          <div className="mt-6 rounded border border-slate-200 bg-white p-4 shadow-sm">
+            <form action={updateInternalNotesAction.bind(null, reservation.id)} className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold">Interne Notiz</h3>
+                <button
+                  type="submit"
+                  className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-brand/90"
+                >
+                  Speichern
+                </button>
+              </div>
+              <textarea
+                name="internalNotes"
+                defaultValue={reservation.internalNotes ?? ''}
+                rows={5}
+                className="w-full rounded border border-slate-200 px-3 py-2 text-sm leading-relaxed"
+                placeholder="Kurze interne Notiz hinzufügen (nicht sichtbar für Gäste)"
+              />
+              <p className="text-xs text-slate-500">
+                Nur für das Team sichtbar. Die Notiz wird gespeichert, aber nicht versendet.
+              </p>
+            </form>
+          </div>
 
           <div className="mt-6">
             <h3 className="text-lg font-semibold">Audit Log</h3>

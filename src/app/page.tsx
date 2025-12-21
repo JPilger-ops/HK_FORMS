@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -11,6 +12,15 @@ export default async function Home() {
     <>
       <main className="mx-auto flex min-h-[70vh] max-w-4xl flex-col items-center justify-center gap-8 p-8 text-center">
         <div>
+          <div className="mb-3 flex justify-center">
+            <Image
+              src="/HK_FAVI.png"
+              alt="Waldwirtschaft Heidekönig Logo"
+              width={64}
+              height={64}
+              className="rounded-xl shadow-sm"
+            />
+          </div>
           <p className="text-sm uppercase tracking-widest text-slate-500">
             Waldwirtschaft Heidekönig
           </p>
