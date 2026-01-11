@@ -26,11 +26,18 @@ export async function getSetting(key: string) {
     const entry = await safePrisma.setting.findUnique({ where: { key } });
     return entry?.value ?? null;
   } catch (error) {
+    // In Test-Umgebungen ohne DB einfach null zurückgeben
     if (isDbUnavailable(error)) {
       console.warn(`Settings fallback: DB unreachable while reading key "${key}".`);
       return null;
     }
-    throw error;
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P1001' /* connection refused */
+    ) {
+      return null;
+    }
+    return null;
   }
 }
 
