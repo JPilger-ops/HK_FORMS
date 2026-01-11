@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: ["**"]
   pull_request:
-    branches: [main, dev]
+    branches: ["**"]
+  workflow_dispatch:
 
 env:
   NODE_VERSION: 20
@@ -41,7 +42,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event_name == 'push'
+    # Nur auf Push, und nur auf main/dev Images pushen
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev'))
     steps:
       - name: Checkout
         uses: actions/checkout@v4
