@@ -1,11 +1,16 @@
 import { prisma } from './prisma';
+import { Prisma } from '@prisma/client';
 
 function isDbUnavailable(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return ['P1000', 'P1001', 'P1010', 'P1011', 'P1017'].includes(error.code);
+  }
   return (
     typeof error === 'object' &&
     error !== null &&
     'code' in error &&
-    ((error as { code?: string }).code === 'P1001' || (error as { code?: string }).code === 'P1000')
+    typeof (error as { code?: unknown }).code === 'string' &&
+    String((error as { code?: string }).code).startsWith('P10')
   );
 }
 

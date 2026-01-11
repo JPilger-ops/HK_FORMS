@@ -8,7 +8,6 @@ import { getServerSession } from 'next-auth';
 import { cookies, headers } from 'next/headers';
 import { checkRateLimit } from './rate-limit';
 import { getAutoLogoutMinutes } from './config';
-import { cache } from 'react';
 import { getNetworkSettings } from './settings';
 
 const SESSION_MAX_AGE_SECONDS = Math.max(5, getAutoLogoutMinutes()) * 60;
@@ -128,7 +127,13 @@ function headerBaseUrl() {
 
 const localFallback = `http://localhost:${process.env.PORT ?? 3000}`;
 
-const loadNetworkSettings = cache(async () => getNetworkSettings());
+let networkSettingsPromise: Promise<Awaited<ReturnType<typeof getNetworkSettings>>> | null = null;
+async function loadNetworkSettings() {
+  if (!networkSettingsPromise) {
+    networkSettingsPromise = getNetworkSettings();
+  }
+  return networkSettingsPromise;
+}
 
 function normalizeUrl(value?: string | null) {
   if (!value) return null;
