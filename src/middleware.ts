@@ -1,6 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const enforceRouting = process.env.ENFORCE_DOMAIN_ROUTING !== 'false';
+type NetworkConfig = {
+  adminBaseUrl: string | null;
+  publicFormUrl: string | null;
+  enforceDomainRouting: boolean;
+};
+
+const envConfig: NetworkConfig = {
+  adminBaseUrl:
+    (process.env.ADMIN_BASE_URL && safeUrl(process.env.ADMIN_BASE_URL)?.origin) ||
+    (process.env.APP_URL && safeUrl(process.env.APP_URL)?.origin) ||
+    (process.env.NEXTAUTH_URL && safeUrl(process.env.NEXTAUTH_URL)?.origin) ||
+    null,
+  publicFormUrl:
+    (process.env.PUBLIC_FORM_URL && safeUrl(process.env.PUBLIC_FORM_URL)?.origin) ||
+    (process.env.FORM_BASE_URL && safeUrl(process.env.FORM_BASE_URL)?.origin) ||
+    null,
+  enforceDomainRouting: process.env.ENFORCE_DOMAIN_ROUTING !== 'false'
+};
+
+async function loadNetworkConfig(request: NextRequest): Promise<NetworkConfig> {
+  try {
+    const response = await fetch(new URL('/api/internal/network-config', request.url), {
+      cache: 'force-cache',
+      next: { revalidate: 30 }
+    });
+    if (!response.ok) {
+      return envConfig;
+    }
+    const json = (await response.json()) as any;
+    return {
+      adminBaseUrl: typeof json?.adminBaseUrl === 'string' ? json.adminBaseUrl : envConfig.adminBaseUrl,
+      publicFormUrl:
+        typeof json?.publicFormUrl === 'string' ? json.publicFormUrl : envConfig.publicFormUrl,
+      enforceDomainRouting:
+        typeof json?.enforceDomainRouting === 'boolean'
+          ? json.enforceDomainRouting
+          : envConfig.enforceDomainRouting
+    };
+  } catch (error) {
+    console.error('network config fetch failed', error);
+    return envConfig;
+  }
+}
 
 function safeUrl(value?: string | null) {
   if (!value) return null;
@@ -11,16 +53,18 @@ function safeUrl(value?: string | null) {
   }
 }
 
-const adminUrl =
-  safeUrl(process.env.ADMIN_BASE_URL) ||
-  safeUrl(process.env.APP_URL) ||
-  safeUrl(process.env.NEXTAUTH_URL);
-const formUrl = safeUrl(process.env.PUBLIC_FORM_URL) || safeUrl(process.env.FORM_BASE_URL);
-
-export function middleware(request: NextRequest) {
-  if (!enforceRouting || process.env.NODE_ENV !== 'production') {
+export async function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/api/internal/network-config')) {
     return NextResponse.next();
   }
+
+  const { adminBaseUrl, publicFormUrl, enforceDomainRouting } = await loadNetworkConfig(request);
+  if (!enforceDomainRouting || process.env.NODE_ENV !== 'production') {
+    return NextResponse.next();
+  }
+
+  const adminUrl = safeUrl(adminBaseUrl);
+  const formUrl = safeUrl(publicFormUrl);
 
   const host = request.headers.get('host');
   const { pathname } = request.nextUrl;

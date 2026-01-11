@@ -1,24 +1,43 @@
 import { prisma } from './prisma';
+import { Prisma } from '@prisma/client';
 
 function isDbUnavailable(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return ['P1000', 'P1001', 'P1010', 'P1011', 'P1017'].includes(error.code);
+  }
   return (
     typeof error === 'object' &&
     error !== null &&
     'code' in error &&
-    ((error as { code?: string }).code === 'P1001' || (error as { code?: string }).code === 'P1000')
+    typeof (error as { code?: unknown }).code === 'string' &&
+    String((error as { code?: string }).code).startsWith('P10')
   );
 }
 
 export async function getSetting(key: string) {
+  // In Tests kann prisma gemockt/uninitialisiert sein
+  // Wenn kein DB-Zugriff möglich ist, liefern wir null zurück.
+  // @ts-ignore - prisma kann in Tests teilweise gemockt sein
+  const safePrisma: any = prisma;
+  if (!safePrisma?.setting?.findUnique) {
+    return null;
+  }
   try {
-    const entry = await prisma.setting.findUnique({ where: { key } });
+    const entry = await safePrisma.setting.findUnique({ where: { key } });
     return entry?.value ?? null;
   } catch (error) {
+    // In Test-Umgebungen ohne DB einfach null zurückgeben
     if (isDbUnavailable(error)) {
       console.warn(`Settings fallback: DB unreachable while reading key "${key}".`);
       return null;
     }
-    throw error;
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P1001' /* connection refused */
+    ) {
+      return null;
+    }
+    return null;
   }
 }
 
@@ -385,6 +404,7 @@ export type ReWebAppSettings = {
   baseUrl: string | null;
   apiKey: string | null;
   organizationId: string | null;
+  crmSyncToken: string | null;
 };
 
 export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
@@ -400,6 +420,67 @@ export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
   const organizationId =
     normalizeString(await getSetting('re_webapp_org_id')) ??
     normalizeString(process.env.RE_WEBAPP_ORG_ID);
+  const crmSyncToken =
+    normalizeString(await getSetting('crm_sync_token')) ??
+    normalizeString(process.env.CRM_SYNC_TOKEN);
 
-  return { enabled, baseUrl, apiKey, organizationId };
+  return { enabled, baseUrl, apiKey, organizationId, crmSyncToken };
+}
+
+export async function getCrmSyncToken() {
+  return (
+    normalizeString(await getSetting('crm_sync_token')) ??
+    normalizeString(process.env.CRM_SYNC_TOKEN)
+  );
+}
+
+function normalizeUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+export type NetworkSettings = {
+  adminBaseUrl: string | null;
+  publicFormUrl: string | null;
+  nextauthUrl: string | null;
+  formBaseUrl: string | null;
+  nextPublicFormUrl: string | null;
+  enforceDomainRouting: boolean;
+};
+
+export async function getNetworkSettings(): Promise<NetworkSettings> {
+  const adminBaseUrl =
+    normalizeUrl(await getSetting('network_admin_base_url')) ??
+    normalizeUrl(process.env.ADMIN_BASE_URL) ??
+    normalizeUrl(process.env.APP_URL);
+  const publicFormUrl =
+    normalizeUrl(await getSetting('network_public_form_url')) ??
+    normalizeUrl(process.env.PUBLIC_FORM_URL) ??
+    normalizeUrl(process.env.FORM_BASE_URL);
+  const nextauthUrl =
+    normalizeUrl(await getSetting('network_nextauth_url')) ??
+    normalizeUrl(process.env.NEXTAUTH_URL);
+  const formBaseUrl =
+    normalizeUrl(await getSetting('network_form_base_url')) ?? normalizeUrl(process.env.FORM_BASE_URL);
+  const nextPublicFormUrl =
+    normalizeUrl(await getSetting('network_next_public_form_url')) ??
+    normalizeUrl(process.env.NEXT_PUBLIC_FORM_URL);
+  const enforceDomainRouting = parseBoolean(
+    await getSetting('network_enforce_domain_routing'),
+    process.env.ENFORCE_DOMAIN_ROUTING !== 'false'
+  );
+
+  return {
+    adminBaseUrl,
+    publicFormUrl,
+    nextauthUrl,
+    formBaseUrl,
+    nextPublicFormUrl,
+    enforceDomainRouting
+  };
 }

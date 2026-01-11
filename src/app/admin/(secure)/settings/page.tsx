@@ -30,6 +30,11 @@ const cards = [
     description: 'E-Mail-Benachrichtigungen für neue Reservierungen konfigurieren.'
   },
   {
+    href: '/admin/settings/network',
+    title: 'Network',
+    description: 'Domains, NextAuth-URL und Domain-Routing verwalten.'
+  },
+  {
     href: '/admin/settings/re-webapp',
     title: 'RE-WebAPP Verbindung',
     description: 'API-URL und Schlüssel für die RE-WebAPP-Anbindung verwalten.'

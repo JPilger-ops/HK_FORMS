@@ -35,7 +35,7 @@ function buildResponse(invoice: any) {
 }
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const authError = validateCrmToken(request);
+  const authError = await validateCrmToken(request);
   if (authError) return authError;
 
   const reservation = await prisma.reservationRequest.findUnique({
@@ -55,7 +55,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const authError = validateCrmToken(request);
+  const authError = await validateCrmToken(request);
   if (authError) return authError;
 
   let parsed: z.infer<typeof payloadSchema>;

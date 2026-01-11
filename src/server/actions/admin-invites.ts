@@ -24,7 +24,7 @@ export async function createAndSendInviteAction({
   if (!recipientEmail) {
     throw new Error('Recipient required');
   }
-  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
+  const formBase = (await getPublicFormBaseUrl()).replace(/\/$/, '');
   const { token, invite } = await createInviteLink({
     formKey,
     createdByUserId: session.user?.id,
@@ -58,7 +58,7 @@ export async function resendInviteAction(inviteId: string) {
   if (!invite || !invite.recipientEmail) {
     throw new Error('Invite not found or no recipient');
   }
-  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
+  const formBase = (await getPublicFormBaseUrl()).replace(/\/$/, '');
   const { token, invite: newInvite } = await createInviteLink({
     formKey: invite.formKey,
     createdByUserId: session.user?.id,

@@ -16,7 +16,8 @@ export default async function ReWebAppSettingsPage() {
     const baseUrl = (formData.get('baseUrl') as string) ?? '';
     const apiKey = (formData.get('apiKey') as string) ?? '';
     const organizationId = (formData.get('organizationId') as string) ?? '';
-    await updateReWebAppSettingsAction({ enabled, baseUrl, apiKey, organizationId });
+    const crmSyncToken = (formData.get('crmSyncToken') as string) ?? '';
+    await updateReWebAppSettingsAction({ enabled, baseUrl, apiKey, organizationId, crmSyncToken });
   }
 
   return (
@@ -74,6 +75,19 @@ export default async function ReWebAppSettingsPage() {
             />
             <p className="mt-1 text-xs text-slate-500">
               Bestehender Schlüssel bleibt erhalten, wenn das Feld leer ist (oder aus RE_WEBAPP_API_KEY).
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">CRM Sync Token</label>
+            <input
+              type="password"
+              name="crmSyncToken"
+              placeholder="Nur ausfüllen, wenn ändern"
+              className="mt-1 w-full rounded border border-slate-200 px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Token für eingehende CRM-Requests. Bleibt unverändert, wenn das Feld leer ist (oder aus CRM_SYNC_TOKEN).
             </p>
           </div>
 

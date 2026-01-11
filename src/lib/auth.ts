@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth';
 import { cookies, headers } from 'next/headers';
 import { checkRateLimit } from './rate-limit';
 import { getAutoLogoutMinutes } from './config';
+import { getNetworkSettings } from './settings';
 
 const SESSION_MAX_AGE_SECONDS = Math.max(5, getAutoLogoutMinutes()) * 60;
 
@@ -116,16 +117,6 @@ export async function getSessionUser() {
   return session?.user;
 }
 
-function normalizeUrl(value?: string | null) {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return null;
-  }
-}
-
 function headerBaseUrl() {
   const h = headers();
   const proto = h.get('x-forwarded-proto');
@@ -136,11 +127,31 @@ function headerBaseUrl() {
 
 const localFallback = `http://localhost:${process.env.PORT ?? 3000}`;
 
-export function getAdminBaseUrl() {
+let networkSettingsPromise: Promise<Awaited<ReturnType<typeof getNetworkSettings>>> | null = null;
+async function loadNetworkSettings() {
+  if (!networkSettingsPromise) {
+    networkSettingsPromise = getNetworkSettings();
+  }
+  return networkSettingsPromise;
+}
+
+function normalizeUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAdminBaseUrl() {
   const cookie = cookies().get('APP_URL')?.value;
+  const settings = await loadNetworkSettings();
   return (
     headerBaseUrl() ||
     normalizeUrl(cookie) ||
+    normalizeUrl(settings.adminBaseUrl) ||
     normalizeUrl(process.env.ADMIN_BASE_URL) ||
     normalizeUrl(process.env.APP_URL) ||
     normalizeUrl(process.env.NEXTAUTH_URL) ||
@@ -148,8 +159,12 @@ export function getAdminBaseUrl() {
   ).replace(/\/$/, '');
 }
 
-export function getPublicFormBaseUrl() {
+export async function getPublicFormBaseUrl() {
+  const settings = await loadNetworkSettings();
   return (
+    normalizeUrl(settings.publicFormUrl) ||
+    normalizeUrl(settings.formBaseUrl) ||
+    normalizeUrl(settings.nextPublicFormUrl) ||
     normalizeUrl(process.env.PUBLIC_FORM_URL) ||
     normalizeUrl(process.env.FORM_BASE_URL) ||
     normalizeUrl(process.env.NEXT_PUBLIC_FORM_URL) ||
@@ -160,7 +175,7 @@ export function getPublicFormBaseUrl() {
   ).replace(/\/$/, '');
 }
 
-export function getBaseUrl() {
+export async function getBaseUrl() {
   return getAdminBaseUrl();
 }
 
