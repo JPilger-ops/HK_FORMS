@@ -15,8 +15,15 @@ function isDbUnavailable(error: unknown) {
 }
 
 export async function getSetting(key: string) {
+  // In Tests kann prisma gemockt/uninitialisiert sein
+  // Wenn kein DB-Zugriff möglich ist, liefern wir null zurück.
+  // @ts-ignore - prisma kann in Tests teilweise gemockt sein
+  const safePrisma: any = prisma;
+  if (!safePrisma?.setting?.findUnique) {
+    return null;
+  }
   try {
-    const entry = await prisma.setting.findUnique({ where: { key } });
+    const entry = await safePrisma.setting.findUnique({ where: { key } });
     return entry?.value ?? null;
   } catch (error) {
     if (isDbUnavailable(error)) {
