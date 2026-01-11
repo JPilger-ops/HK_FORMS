@@ -9,7 +9,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
 COMPOSE_FILE="${ROOT_DIR}/compose.yaml"
-APP_IMAGE_DEFAULT="hkforms_main-app"
+APP_IMAGE_DEFAULT=""
 
 if [[ ! -f "${COMPOSE_FILE}" ]]; then
   echo "compose.yaml nicht gefunden unter ${COMPOSE_FILE}" >&2
@@ -190,8 +190,14 @@ collect_values() {
   logout="$(prompt "AUTO_LOGOUT_MINUTES (optional)" "${current_logout:-30}")"
   logout_public="$(prompt "NEXT_PUBLIC_AUTO_LOGOUT_MINUTES (optional)" "${current_logout_public:-${logout:-30}}")"
 
+  local default_image_prompt="ghcr.io/<org>/hkforms_main-app"
   local image_name image_tag
-  image_name="$(prompt "APP_IMAGE (inkl. Registry, z. B. ghcr.io/org/hkforms_main-app)" "${current_image_name:-$APP_IMAGE_DEFAULT}")"
+  image_name="$(prompt "APP_IMAGE (inkl. Registry, z. B. ${default_image_prompt})" "${current_image_name:-$APP_IMAGE_DEFAULT}")"
+  # erzwinge sinnvollen Wert
+  while [[ -z "$image_name" || "$image_name" == "hkforms_main-app" || "$image_name" == "${default_image_prompt}" ]]; do
+    echo "Bitte vollständigen Image-Pfad inkl. Registry/Namespace angeben (z. B. ghcr.io/org/hkforms_main-app)."
+    image_name="$(prompt "APP_IMAGE (inkl. Registry)" "${current_image_name:-}")"
+  done
   image_tag="$(prompt "APP_IMAGE_TAG (für compose.yaml)" "${current_image_tag:-latest}")"
 
   local pull_now
