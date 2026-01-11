@@ -23,7 +23,7 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
    ```bash
    bash scripts/deploy-wizard.sh install
    ```
-   - Image/Tag: `APP_IMAGE` (z. B. `ghcr.io/<org>/hkforms_main-app`), `APP_IMAGE_TAG` (z. B. `latest`/`dev`/SHA) werden in `.env` geschrieben und per `docker pull` geholt.
+   - Image/Tag: `APP_IMAGE` (vollständiger Pfad inkl. Registry/Namensraum, z. B. `ghcr.io/<org>/hkforms_main-app`), `APP_IMAGE_TAG` (z. B. `latest`/`dev`/SHA) werden in `.env` geschrieben und per `docker pull` geholt.
    - Network/Domain-Settings bitte im Admin-UI (Settings → Network) pflegen.
 3. Logs prüfen / Container steuern  
    ```bash
