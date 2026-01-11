@@ -40,7 +40,7 @@ export async function sendInviteLinkEmailAction({
     recipientEmail: recipient,
     expiresInDays: expiresInDays ?? defaultDays
   });
-  const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
+  const base = (appUrl || (await getPublicFormBaseUrl())).replace(/\/$/, '');
   await sendInviteEmail({
     inviteId: invite.id,
     to: recipient,

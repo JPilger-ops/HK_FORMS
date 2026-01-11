@@ -153,18 +153,22 @@ export async function updateReWebAppSettingsAction({
   enabled,
   baseUrl,
   apiKey,
-  organizationId
+  organizationId,
+  crmSyncToken
 }: {
   enabled: boolean;
   baseUrl: string;
   apiKey?: string;
   organizationId?: string;
+  crmSyncToken?: string;
 }) {
   await assertPermission('manage:settings');
   const cleanBase = (baseUrl ?? '').trim().replace(/\/+$/, '');
   const cleanOrg = (organizationId ?? '').trim();
   const currentApiKey = (await getSetting('re_webapp_api_key')) ?? process.env.RE_WEBAPP_API_KEY ?? '';
   const nextApiKey = apiKey?.trim() ? apiKey.trim() : currentApiKey;
+  const currentCrmToken = (await getSetting('crm_sync_token')) ?? process.env.CRM_SYNC_TOKEN ?? '';
+  const nextCrmToken = crmSyncToken?.trim() ? crmSyncToken.trim() : currentCrmToken;
 
   await setSetting('re_webapp_enabled', enabled ? 'true' : 'false');
   await setSetting('re_webapp_base_url', cleanBase);
@@ -172,8 +176,55 @@ export async function updateReWebAppSettingsAction({
   if (nextApiKey) {
     await setSetting('re_webapp_api_key', nextApiKey);
   }
+  if (nextCrmToken) {
+    await setSetting('crm_sync_token', nextCrmToken);
+  }
 
   revalidatePath('/admin/settings/re-webapp');
+}
+
+export async function updateNetworkSettingsAction({
+  adminBaseUrl,
+  publicFormUrl,
+  nextauthUrl,
+  formBaseUrl,
+  nextPublicFormUrl,
+  enforceDomainRouting
+}: {
+  adminBaseUrl?: string;
+  publicFormUrl?: string;
+  nextauthUrl?: string;
+  formBaseUrl?: string;
+  nextPublicFormUrl?: string;
+  enforceDomainRouting: boolean;
+}) {
+  await assertPermission('manage:settings');
+
+  const normalize = (value?: string | null) => {
+    const trimmed = (value ?? '').trim();
+    if (!trimmed) return '';
+    try {
+      const url = new URL(trimmed);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const normalizedAdmin = normalize(adminBaseUrl);
+  const normalizedPublic = normalize(publicFormUrl);
+  const normalizedNextauth = normalize(nextauthUrl);
+  const normalizedFormBase = normalize(formBaseUrl);
+  const normalizedNextPublic = normalize(nextPublicFormUrl);
+
+  await setSetting('network_admin_base_url', normalizedAdmin);
+  await setSetting('network_public_form_url', normalizedPublic);
+  await setSetting('network_nextauth_url', normalizedNextauth);
+  await setSetting('network_form_base_url', normalizedFormBase);
+  await setSetting('network_next_public_form_url', normalizedNextPublic);
+  await setSetting('network_enforce_domain_routing', enforceDomainRouting ? 'true' : 'false');
+
+  revalidatePath('/admin/settings/network');
 }
 
 export async function testSmtpSettingsAction() {

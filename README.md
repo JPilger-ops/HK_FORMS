@@ -13,46 +13,32 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
 - Optional lokal: Node.js 20+ / npm für Entwicklung ohne Docker.
 - `.env` erforderlich (Beispiel: `.env.example`, falls vorhanden); enthält URLs, Secrets, DB, SMTP, Preise etc.
 
-## 3) Installation & Start mit Docker (Schritt für Schritt)
+## 3) Installation & Start mit Docker (Wizard)
 1. Repo klonen  
    ```bash
    git clone https://github.com/<org>/hkforms.git
    cd hkforms
    ```
-2. `.env` anlegen/prüfen  
+2. Deploy-Wizard starten (Install) – fragt Secrets/DB/Tags, zieht Image und startet Compose:  
    ```bash
-   cp .env.example .env   # falls vorhanden
-   # Werte für URLs, NEXTAUTH_SECRET, INVITE_TOKEN_SECRET, DATABASE_URL, SMTP_* setzen
+   bash scripts/deploy-wizard.sh install
    ```
-3. Image bauen (mit Tag-Version)  
-  ```bash
-  docker build -t hkforms_main-app:0.6.5 .
-  ```
-4. Container starten (Beispiel Docker Compose, App + DB)  
-  ```bash
-  docker compose up -d          # nutzt docker-compose.yml / compose.yaml
-  # App auf Port 3000, DB auf 5432 (siehe .env)
-  ```
-   Alternativ `docker run` (ohne Compose):  
-   ```bash
-   docker run -d --name hkforms \
-     --env-file .env -p 3000:3000 \
-     hkforms_main-app:0.6.5
-   ```
-5. Logs prüfen / Container steuern  
+   - Image/Tag: `APP_IMAGE` (z. B. `ghcr.io/<org>/hkforms_main-app`), `APP_IMAGE_TAG` (z. B. `latest`/`dev`/SHA) werden in `.env` geschrieben und per `docker pull` geholt.
+   - Network/Domain-Settings bitte im Admin-UI (Settings → Network) pflegen.
+3. Logs prüfen / Container steuern  
    ```bash
    docker compose logs -f app
    docker compose stop app
    docker compose start app
    ```
-6. Migration/Seed (falls nicht automatisch)  
+4. Migration/Seed (falls nicht automatisch)  
    ```bash
    docker compose exec app npm run prisma:migrate
    docker compose exec app npm run db:seed   # optional; nutzt ADMIN_EMAIL/ADMIN_PASSWORD
    ```
 
 ## 4) Wichtige Docker-Befehle (mit Versionierung)
-- Build mit Tag: `docker build -t name:version .`
+- Pull mit Tag: `docker pull <registry>/<name>:<tag>`
 - Start/Stop mit Compose: `docker compose up -d`, `docker compose down`
 - Logs: `docker compose logs -f app`
 - In Container: `docker compose exec app sh`
@@ -82,8 +68,8 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
 - Lint: `npm run lint`
 
 ## 7) Deployment/Release
-- Images versionieren (z. B. `hkforms_main-app:0.6.5`) und im Registry ablegen.
-- Deployment via Compose/Orchestrator: Image-Tag aktualisieren, `docker compose pull && docker compose up -d`.
+- CI (GitHub Actions) baut + pusht Images zu GHCR: `ghcr.io/<owner>/hkforms_main-app:<sha>` und `latest`/Branch-Tag auf main/dev.
+- Deployment via Compose/Orchestrator: `APP_IMAGE`/`APP_IMAGE_TAG` in `.env` setzen (Wizard: `bash scripts/deploy-wizard.sh update`), dann `docker compose pull && docker compose up -d`.
 - Migrations sicherstellen: `npm run prisma:migrate` (oder automatisiert beim Start).
 
 ## 8) Troubleshooting

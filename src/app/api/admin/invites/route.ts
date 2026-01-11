@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     maxUses
   });
 
-  const formBase = getPublicFormBaseUrl().replace(/\/$/, '');
+  const formBase = (await getPublicFormBaseUrl()).replace(/\/$/, '');
   const link = `${formBase}/request?token=${encodeURIComponent(token)}`;
   await sendInviteEmail({
     inviteId: invite.id,

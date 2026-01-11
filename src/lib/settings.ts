@@ -385,6 +385,7 @@ export type ReWebAppSettings = {
   baseUrl: string | null;
   apiKey: string | null;
   organizationId: string | null;
+  crmSyncToken: string | null;
 };
 
 export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
@@ -400,6 +401,67 @@ export async function getReWebAppSettings(): Promise<ReWebAppSettings> {
   const organizationId =
     normalizeString(await getSetting('re_webapp_org_id')) ??
     normalizeString(process.env.RE_WEBAPP_ORG_ID);
+  const crmSyncToken =
+    normalizeString(await getSetting('crm_sync_token')) ??
+    normalizeString(process.env.CRM_SYNC_TOKEN);
 
-  return { enabled, baseUrl, apiKey, organizationId };
+  return { enabled, baseUrl, apiKey, organizationId, crmSyncToken };
+}
+
+export async function getCrmSyncToken() {
+  return (
+    normalizeString(await getSetting('crm_sync_token')) ??
+    normalizeString(process.env.CRM_SYNC_TOKEN)
+  );
+}
+
+function normalizeUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+export type NetworkSettings = {
+  adminBaseUrl: string | null;
+  publicFormUrl: string | null;
+  nextauthUrl: string | null;
+  formBaseUrl: string | null;
+  nextPublicFormUrl: string | null;
+  enforceDomainRouting: boolean;
+};
+
+export async function getNetworkSettings(): Promise<NetworkSettings> {
+  const adminBaseUrl =
+    normalizeUrl(await getSetting('network_admin_base_url')) ??
+    normalizeUrl(process.env.ADMIN_BASE_URL) ??
+    normalizeUrl(process.env.APP_URL);
+  const publicFormUrl =
+    normalizeUrl(await getSetting('network_public_form_url')) ??
+    normalizeUrl(process.env.PUBLIC_FORM_URL) ??
+    normalizeUrl(process.env.FORM_BASE_URL);
+  const nextauthUrl =
+    normalizeUrl(await getSetting('network_nextauth_url')) ??
+    normalizeUrl(process.env.NEXTAUTH_URL);
+  const formBaseUrl =
+    normalizeUrl(await getSetting('network_form_base_url')) ?? normalizeUrl(process.env.FORM_BASE_URL);
+  const nextPublicFormUrl =
+    normalizeUrl(await getSetting('network_next_public_form_url')) ??
+    normalizeUrl(process.env.NEXT_PUBLIC_FORM_URL);
+  const enforceDomainRouting = parseBoolean(
+    await getSetting('network_enforce_domain_routing'),
+    process.env.ENFORCE_DOMAIN_ROUTING !== 'false'
+  );
+
+  return {
+    adminBaseUrl,
+    publicFormUrl,
+    nextauthUrl,
+    formBaseUrl,
+    nextPublicFormUrl,
+    enforceDomainRouting
+  };
 }

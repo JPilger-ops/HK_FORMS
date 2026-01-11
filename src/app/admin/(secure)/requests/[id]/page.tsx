@@ -39,7 +39,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
     notFound();
   }
   const hostSignature = reservation.signatures.find((s) => s.type === 'HOST');
-  const base = getBaseUrl();
+  const base = await getBaseUrl();
   const legacy = (reservation.legacyData ?? {}) as Record<string, any>;
   const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   const formatMoney = (value?: any) =>

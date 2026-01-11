@@ -92,7 +92,7 @@ export async function sendInviteEmail({
   expiresAt?: Date | string | null;
 }) {
   const { transporter, from } = await getTransporter();
-  const base = (appUrl || getPublicFormBaseUrl()).replace(/\/$/, '');
+  const base = (appUrl || (await getPublicFormBaseUrl())).replace(/\/$/, '');
   const link = `${base}/request?token=${encodeURIComponent(token)}&form=${encodeURIComponent(formKey)}`;
   const inviteTemplate = await getInviteTemplateSettings();
   const expiresDate =

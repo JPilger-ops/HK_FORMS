@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: hkforms_main-app:${APP_IMAGE_TAG:-latest}
+    image: ${APP_IMAGE:-hkforms_main-app}:${APP_IMAGE_TAG:-latest}
     env_file:
       - .env
     environment:

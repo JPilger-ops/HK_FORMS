@@ -16,7 +16,7 @@ services:
   
 
   app:
-    image: hkforms:latest
+    image: ${APP_IMAGE:-hkforms}:${APP_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       - db
