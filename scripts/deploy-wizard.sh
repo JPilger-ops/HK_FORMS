@@ -154,6 +154,9 @@ collect_values() {
   local current_image_tag current_image_name
   current_image_tag="$(get_env_value APP_IMAGE_TAG || true)"
   current_image_name="$(get_env_value APP_IMAGE || true)"
+  local current_admin_email current_admin_password
+  current_admin_email="$(get_env_value ADMIN_EMAIL || true)"
+  current_admin_password="$(get_env_value ADMIN_PASSWORD || true)"
 
   local nextauth_secret invite_secret invite_require invite_days invite_hours
   nextauth_secret="$(prompt "NEXTAUTH_SECRET" "${current_nextauth:-$(random_secret)}" true)"
@@ -203,6 +206,12 @@ collect_values() {
   local pull_now
   pull_now="$(prompt "Image jetzt per docker pull holen? (y/n)" "y")"
 
+  local admin_email admin_password
+  if [[ "$mode" == "install" ]]; then
+    admin_email="$(prompt "ADMIN_EMAIL (für Seed/Login)" "${current_admin_email:-admin@example.com}" true)"
+    admin_password="$(prompt "ADMIN_PASSWORD (für Seed/Login)" "${current_admin_password:-}" true)"
+  fi
+
   SUMMARY=()
   SUMMARY+=("NEXTAUTH_SECRET=[hidden]")
   SUMMARY+=("INVITE_TOKEN_SECRET=[hidden]")
@@ -216,6 +225,10 @@ collect_values() {
   SUMMARY+=("APP_IMAGE=${image_name}")
   SUMMARY+=("APP_IMAGE_TAG=${image_tag}")
   [[ "$pull_now" =~ ^[Yy]$ ]] && SUMMARY+=("Pull Image=${image_name}:${image_tag}")
+  if [[ "$mode" == "install" ]]; then
+    SUMMARY+=("ADMIN_EMAIL=${admin_email}")
+    SUMMARY+=("ADMIN_PASSWORD=[hidden]")
+  fi
 
   echo ""
   echo "$(bold "Zusammenfassung")"
@@ -239,7 +252,7 @@ collect_values() {
     APP_PORT "$app_port"
     AUTO_LOGOUT_MINUTES "$logout"
     NEXT_PUBLIC_AUTO_LOGOUT_MINUTES "$logout_public"
-    APP_IMAGE_TAG "$image_tag" \
+    APP_IMAGE_TAG "$image_tag"
     APP_IMAGE "$image_name"
   )
 
@@ -250,6 +263,13 @@ collect_values() {
       POSTGRES_DB "${pg_db:-hkforms}"
       POSTGRES_HOST "${pg_host:-db}"
       POSTGRES_PORT "${pg_port:-5432}"
+    )
+  fi
+
+  if [[ "$mode" == "install" ]]; then
+    env_pairs+=(
+      ADMIN_EMAIL "$admin_email"
+      ADMIN_PASSWORD "$admin_password"
     )
   fi
 
@@ -324,6 +344,28 @@ main() {
     echo "$(red "[!]") Ungültiger Modus: $mode" >&2
     exit 1
   fi
+
+  # Installationsverzeichnis wählen (nur Install)
+  if [[ "$mode" == "install" ]]; then
+    local current_root="$ROOT_DIR"
+    local target_dir
+    target_dir="$(prompt "Installationsverzeichnis" "$current_root")"
+    target_dir="${target_dir:-$current_root}"
+    if [[ "$target_dir" != "$current_root" ]]; then
+      if ! command -v rsync >/dev/null 2>&1; then
+        echo "$(red "[!]") rsync wird für das Kopieren benötigt." >&2
+        exit 1
+      fi
+      mkdir -p "$target_dir"
+      echo "$(bold "Kopiere Projekt nach $target_dir ...")"
+      rsync -a --delete --exclude '.git' --exclude 'node_modules' "$current_root/" "$target_dir/"
+      ROOT_DIR="$target_dir"
+      ENV_FILE="${ROOT_DIR}/.env"
+      COMPOSE_FILE="${ROOT_DIR}/compose.yaml"
+      echo "$(green "[ok]") Projekt kopiert. Arbeiten nun in ${ROOT_DIR}"
+    fi
+  fi
+
   echo ""
   echo "$(yellow "[Hinweis]") Netzwerk-/Domain-Settings bitte im Admin-UI (Network) pflegen. Wizard ändert diese nicht."
   collect_values "$mode"
