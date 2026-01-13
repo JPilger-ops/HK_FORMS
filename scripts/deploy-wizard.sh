@@ -330,6 +330,15 @@ do_deploy() {
   echo "$(bold "Starte docker compose (${mode}) ...")"
   (cd "$ROOT_DIR" && docker compose -f "$COMPOSE_FILE" up -d)
   echo "$(green "[ok]") Deployment abgeschlossen. Logs: docker compose -f ${COMPOSE_FILE} logs -f"
+
+  if [[ "$mode" == "install" ]]; then
+    echo "$(bold "Führe Admin-Seed (npm run db:seed) aus ...")"
+    if (cd "$ROOT_DIR" && docker compose -f "$COMPOSE_FILE" exec -T app npm run db:seed); then
+      echo "$(green "[ok]") Admin-Seed abgeschlossen."
+    else
+      echo "$(red "[!]") Admin-Seed fehlgeschlagen. Bitte manuell ausführen: docker compose -f ${COMPOSE_FILE} exec -T app npm run db:seed"
+    fi
+  fi
 }
 
 main() {
