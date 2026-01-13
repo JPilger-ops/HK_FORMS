@@ -266,7 +266,42 @@ do_pull_and_deploy() {
   local image="$1" tag="$2" mode="$3"
   local ref="${image}:${tag}"
   echo "$(bold "Pull ${ref} ...")"
-  docker pull "$ref"
+  local output=""
+  if ! output="$(docker pull "$ref" 2>&1)"; then
+    echo "$output"
+    if [[ "$output" == *"unauthorized"* || "$output" == *"permission denied"* ]]; then
+      echo "$(yellow "[i]") Pull erfordert Login (z. B. ghcr.io)."
+      if confirm "docker login jetzt durchführen?"; then
+        local registry user pass
+        registry="$(prompt "Registry" "ghcr.io")"
+        read -r -p "$(bold "Username") [-]: " user || true
+        read -s -p "$(bold "Token/Passwort") [-]: " pass || true
+        echo ""
+        if [[ -n "$user" && -n "$pass" ]]; then
+          if echo "$pass" | docker login "$registry" -u "$user" --password-stdin; then
+            if docker pull "$ref"; then
+              echo "$(green "[ok]") Pull erfolgreich nach Login."
+            else
+              echo "$(red "[!]") Pull fehlgeschlagen trotz Login."
+              exit 1
+            fi
+          else
+            echo "$(red "[!]") Login fehlgeschlagen."
+            exit 1
+          fi
+        else
+          echo "$(red "[!]") Login abgebrochen (fehlende Angaben)."
+          exit 1
+        fi
+      else
+        echo "$(red "[!]") Pull abgebrochen (keine Auth)."
+        exit 1
+      fi
+    else
+      echo "$(red "[!]") Pull fehlgeschlagen."
+      exit 1
+    fi
+  fi
   do_deploy "$mode"
 }
 
