@@ -23,7 +23,10 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
    ```bash
    bash scripts/deploy-wizard.sh install
    ```
-   - Image/Tag: `APP_IMAGE` (vollständiger Pfad inkl. Registry/Namensraum, z. B. `ghcr.io/<org>/hkforms_main-app`), `APP_IMAGE_TAG` (z. B. `latest`/`dev`/SHA) werden in `.env` geschrieben und per `docker pull` geholt.
+   - `.env` wird bei Erst-Install aus `.env.example` kopiert und dann mit den abgefragten Werten überschrieben (SMTP/URLs etc. bleiben erhalten).
+   - Image/Tag: `APP_IMAGE` (vollständiger Pfad inkl. Registry/Namensraum, z. B. `ghcr.io/<org>/hkforms_main-app`), `APP_IMAGE_TAG` (z. B. `latest`/`dev`/SHA) werden in `.env` geschrieben und per `docker pull` geholt. Bei privaten Registys ggf. vorher `docker login ghcr.io` mit `read:packages`-Token.
+   - Admin-Seed: Im Install-Modus werden `ADMIN_EMAIL`/`ADMIN_PASSWORD` abgefragt und nach dem Start automatisch `npm run db:seed` ausgeführt (setzt/aktualisiert den Admin).
+   - Optional: Installationsverzeichnis im Wizard wählbar; Projekt wird per `rsync` dorthin kopiert.
    - Network/Domain-Settings bitte im Admin-UI (Settings → Network) pflegen.
 3. Logs prüfen / Container steuern  
    ```bash
@@ -78,3 +81,5 @@ Digitale Reservierungsverwaltung (Next.js, Prisma/PostgreSQL, NextAuth, Tailwind
 - Build schlägt fehl (Prisma): `DATABASE_URL` prüfen, DB erreichbar?, Rechte ok?
 - SMTP-Fehler: Host/Port/SSL-Einstellung (`secure`) und Credentials kontrollieren; Test-Button in den E-Mail-Einstellungen nutzen.
 - Invite/Token-Probleme: `INVITE_TOKEN_SECRET`, Ablaufzeiten (`INVITE_LINK_HOURS`/`INVITE_DEFAULT_EXPIRY_DAYS`) prüfen.
+- Login/Seed-Probleme: Im Install-Wizard `ADMIN_EMAIL`/`ADMIN_PASSWORD` setzen; bei Bedarf `docker compose exec app npm run db:seed` erneut ausführen.
+- Private Registry: Vor dem Wizard `docker login ghcr.io -u <user> --password-stdin` mit Token (`read:packages`) ausführen, sonst scheitert `docker pull`.
