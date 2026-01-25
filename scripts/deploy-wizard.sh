@@ -98,6 +98,11 @@ PY
 write_env() {
   local tmp="${ENV_FILE}.tmp"
   local backup="${ENV_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+  # Falls keine .env existiert, aber eine .env.example vorhanden ist, nutzen wir diese als Basis,
+  # damit unbeaufsichtigte Felder (z. B. SMTP/URLs) nicht verloren gehen.
+  if [[ ! -f "$ENV_FILE" && -f "${ROOT_DIR}/.env.example" ]]; then
+    cp "${ROOT_DIR}/.env.example" "$ENV_FILE"
+  fi
   declare -A overrides=()
   while [[ "$#" -gt 1 ]]; do
     local key="$1"; shift
