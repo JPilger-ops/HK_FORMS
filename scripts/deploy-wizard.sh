@@ -103,12 +103,27 @@ write_env() {
   if [[ ! -f "$ENV_FILE" && -f "${ROOT_DIR}/.env.example" ]]; then
     cp "${ROOT_DIR}/.env.example" "$ENV_FILE"
   fi
+
+  # Defaults aus .env.example erfassen (für fehlende Keys)
+  declare -A example_defaults=()
+  if [[ -f "${ROOT_DIR}/.env.example" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+        local key="${line%%=*}"
+        local val="${line#*=}"
+        example_defaults["$key"]="$val"
+      fi
+    done < "${ROOT_DIR}/.env.example"
+  fi
+
   declare -A overrides=()
   while [[ "$#" -gt 1 ]]; do
     local key="$1"; shift
     local val="$1"; shift
     overrides["$key"]="$val"
   done
+
+  declare -A existing_keys=()
   if [[ -f "$ENV_FILE" ]]; then
     cp "$ENV_FILE" "$backup"
     echo "$(yellow "[i]") Backup erstellt: $backup"
@@ -118,6 +133,7 @@ write_env() {
     while IFS= read -r line; do
       if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
         local key="${line%%=*}"
+        existing_keys["$key"]=1
         if [[ -n "${overrides[$key]+x}" ]]; then
           echo "${key}=${overrides[$key]}" >> "$tmp"
           unset overrides["$key"]
@@ -129,6 +145,12 @@ write_env() {
       fi
     done < "$ENV_FILE"
   fi
+  # Fehlende Keys aus .env.example nachtragen, falls weder gesetzt noch überschrieben
+  for key in "${!example_defaults[@]}"; do
+    if [[ -z "${existing_keys[$key]+x}" && -z "${overrides[$key]+x}" ]]; then
+      overrides["$key"]="${example_defaults[$key]}"
+    fi
+  done
   for key in "${!overrides[@]}"; do
     echo "${key}=${overrides[$key]}" >> "$tmp"
   done
