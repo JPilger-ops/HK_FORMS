@@ -10,19 +10,13 @@ async function main() {
     console.log('ADMIN_EMAIL/ADMIN_PASSWORD not set, skipping admin seed.');
     return;
   }
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    console.log('Admin already exists.');
-    return;
-  }
-  await prisma.user.create({
-    data: {
-      email,
-      passwordHash: await hash(password),
-      role: Role.ADMIN
-    }
+  const passwordHash = await hash(password);
+  await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash, role: Role.ADMIN },
+    create: { email, passwordHash, role: Role.ADMIN }
   });
-  console.log('Seed admin created.');
+  console.log('Seed admin ensured/updated.');
 }
 
 main()
